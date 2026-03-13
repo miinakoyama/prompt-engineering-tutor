@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-pink: #ff0080;
+  --color-brand-orange: #ff8c00;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Georgia', serif;
+}
+
+body {
+  background-color: #fcfcfc;
+  color: #1e293b;
+}
+
+.gradient-text {
+  background: linear-gradient(to right, var(--color-brand-pink), var(--color-brand-orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, var(--color-brand-pink), var(--color-brand-orange));
+}
+
+.gradient-border {
+  border-image: linear-gradient(to right, var(--color-brand-pink), var(--color-brand-orange)) 1;
+}
+
+.clean-card {
+  background: white;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

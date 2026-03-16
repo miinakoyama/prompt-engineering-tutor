@@ -269,7 +269,7 @@ export default function App() {
               <p className="text-slate-600 font-bold uppercase tracking-[0.24em] text-xs">Learn to Write Better Prompts</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="max-w-sm mx-auto space-y-4">
               <p className="text-sm font-bold text-slate-600 uppercase tracking-[0.18em] mb-6">Choose Your Background</p>
               {(['Student', 'Teacher', 'Working Professional'] as UserBackground[]).map((bg) => (
                 <button

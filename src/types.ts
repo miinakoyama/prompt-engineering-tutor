@@ -4,9 +4,28 @@ export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
 
 export type Level = 1 | 2 | 3;
 
+export type PendingAction =
+  | { kind: 'level'; level: Level }
+  | { kind: 'module'; technique: Technique }
+  | { kind: 'complete' };
+
+export interface CriterionScore {
+  id: string;
+  label: string;
+  score: 0 | 1;
+  reason: string;
+}
+
+export interface FeedbackScore {
+  totalScore: number;
+  maxScore: number;
+  grade: 'green' | 'yellow' | 'red';
+  criteriaScores: CriterionScore[];
+}
+
 export interface LogEntry {
   id: string;
-  type: 'intro' | 'build' | 'predict' | 'result' | 'review';
+  type: 'intro' | 'build' | 'predict' | 'result' | 'review' | 'completion';
   content: string;
   prediction?: string;
   prompt?: string;
@@ -16,7 +35,28 @@ export interface LogEntry {
   technique?: Technique;
   level?: Level;
   submittedPrompt?: string;
+  title?: string;
+  task?: string;
+  previousPrompt?: string;
+  reviewType?: 'choice' | 'feedback';
+  comparisonBad?: string;
+  comparisonGood?: string;
+  feedbackScore?: FeedbackScore;
   timestamp: number;
+}
+
+export interface RubricCriterion {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface Rubric {
+  criteria: RubricCriterion[];
+  thresholds: {
+    green: number;
+    yellow: number;
+  };
 }
 
 export interface ModuleLevel {
@@ -26,6 +66,8 @@ export interface ModuleLevel {
   choices?: { text: string; isCorrect: boolean; explanation: string }[];
   blanks?: string[];
   template?: string;
+  referencePrompt?: string;
+  rubric?: Rubric;
 }
 
 export interface ModuleContent {

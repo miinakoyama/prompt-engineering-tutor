@@ -236,14 +236,7 @@ export default function App() {
                 {background}
               </span>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                System Ready
-              </span>
-            </div>
-          )}
+          ) : null}
         </div>
       </header>
 

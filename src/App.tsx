@@ -52,32 +52,34 @@ export default function App() {
       type: 'intro',
       content: `Welcome, ${bg}. I'm your Prompt Engineering Mentor. Together, we'll explore the nuances of effective AI communication.`
     });
-    startModule('Zero-shot');
+    startModule('Zero-shot', bg);
   };
 
-  const startModule = (tech: Technique) => {
+  const startModule = (tech: Technique, persona?: UserBackground) => {
     const module = MODULES.find(m => m.id === tech)!;
+    const content = module.byPersona[persona ?? background!];
     setCurrentTechnique(tech);
     setCurrentLevel(1);
     setIsModuleIntro(true);
     setLogs([]); // Clear logs for new module
-    
+
     addLog({
       type: 'intro',
       content: `### ${module.title}\n${module.description}`
     });
-    
+
     addLog({
       type: 'intro',
-      content: `**Comparison:**\n\n*   **Ineffective:** "${module.badExample}"\n*   **Effective:** "${module.goodExample}"`
+      content: `**Comparison:**\n\n*   **Ineffective:** "${content.badExample}"\n*   **Effective:** "${content.goodExample}"`
     });
   };
 
   const proceedToLevel = (level: Level) => {
     setIsModuleIntro(false);
     const module = MODULES.find(m => m.id === currentTechnique)!;
-    const levelData = module.levels[level];
-    
+    const content = module.byPersona[background!];
+    const levelData = content.levels[level];
+
     addLog({
       type: 'build',
       content: `**Level ${level}: ${levelData.title}**\n${levelData.task}`,
@@ -109,10 +111,11 @@ export default function App() {
 
     if (currentLevel === 1) {
       const module = MODULES.find(m => m.id === currentTechnique)!;
+      const content = module.byPersona[background!];
       setTimeout(() => {
         addLog({
           type: 'intro',
-          content: module.instruction
+          content: content.instruction
         });
       }, 1500);
       
@@ -160,12 +163,13 @@ export default function App() {
       });
 
       const module = MODULES.find(m => m.id === currentTechnique)!;
+      const content = module.byPersona[background!];
       let feedbackPrompt = `The user was asked to write a ${currentTechnique} prompt for a specific task. 
         User's prompt: "${prompt}"
         AI's response to that prompt: "${resultText}"
         
         Criteria for a good ${currentTechnique} prompt:
-        ${module.instruction}
+        ${content.instruction}
         
         Analyze the user's prompt against these specific criteria. Be encouraging but rigorous. Explain what they did well and what they could improve to better meet the criteria. (3-4 sentences)`;
 
@@ -379,7 +383,7 @@ export default function App() {
 
                       {log.level === 1 && (
                         <div className="mt-12 space-y-4">
-                          {MODULES.find(m => m.id === log.technique)?.levels[1].choices?.map((choice, idx) => {
+                          {MODULES.find(m => m.id === log.technique)?.byPersona[background!].levels[1].choices?.map((choice, idx) => {
                             const isSelected = log.selectedChoice === choice.text;
                             const hasSelected = !!log.selectedChoice;
                             

@@ -19,21 +19,25 @@ export interface LogEntry {
   timestamp: number;
 }
 
+export interface ModuleLevel {
+  title: string;
+  task: string;
+  options?: string[];
+  choices?: { text: string; isCorrect: boolean; explanation: string }[];
+  blanks?: string[];
+  template?: string;
+}
+
+export interface ModuleContent {
+  badExample: string;
+  goodExample: string;
+  instruction: string;
+  levels: { [key in Level]: ModuleLevel };
+}
+
 export interface Module {
   id: Technique;
   title: string;
   description: string;
-  goodExample: string;
-  badExample: string;
-  instruction: string;
-  levels: {
-    [key in Level]: {
-      title: string;
-      task: string;
-      options?: string[]; // For Level 1 (original)
-      choices?: { text: string; isCorrect: boolean; explanation: string }[]; // For Level 1 (new)
-      blanks?: string[]; // For Level 2
-      template?: string; // For Level 3
-    }
-  };
+  byPersona: Record<UserBackground, ModuleContent>;
 }

@@ -1,4 +1,34 @@
-import { Module } from './types';
+import { Module, Rubric } from './types';
+
+export const ZERO_SHOT_RUBRIC: Rubric = {
+  criteria: [
+    { id: 'specificity', label: 'Specificity', description: 'The task is clearly and precisely defined' },
+    { id: 'audience', label: 'Audience', description: 'The target audience or context is specified' },
+    { id: 'format', label: 'Format', description: 'The desired output format is indicated' },
+    { id: 'constraints', label: 'Constraints', description: 'Length, exclusions, or other boundaries are set' },
+  ],
+  thresholds: { green: 3, yellow: 2 },
+};
+
+export const FEW_SHOT_RUBRIC: Rubric = {
+  criteria: [
+    { id: 'consistency', label: 'Consistency', description: 'All examples follow the exact same format' },
+    { id: 'labeling', label: 'Clear Labels', description: 'Input/output pairs are clearly labeled' },
+    { id: 'diversity', label: 'Diversity', description: 'Examples cover different cases or categories' },
+    { id: 'trigger', label: 'Trailing Trigger', description: 'Ends with a label to prompt the AI to continue' },
+  ],
+  thresholds: { green: 3, yellow: 2 },
+};
+
+export const COT_RUBRIC: Rubric = {
+  criteria: [
+    { id: 'stepbystep', label: 'Step-by-Step', description: 'Explicitly asks for reasoning steps' },
+    { id: 'decomposition', label: 'Decomposition', description: 'Breaks the problem into smaller sub-tasks' },
+    { id: 'verification', label: 'Verification', description: 'Asks the AI to check or verify its reasoning' },
+    { id: 'clarity', label: 'Clarity', description: 'The problem and constraints are clearly stated' },
+  ],
+  thresholds: { green: 3, yellow: 2 },
+};
 
 export const MODULES: Module[] = [
   {
@@ -30,10 +60,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Write a prompt to explain the concept of "Photosynthesis" for a class presentation. Ensure your prompt is specific, sets a tone, defines the audience (e.g., your classmates), and adds constraints (e.g., length or format).',
+            referencePrompt: 'Explain the concept of photosynthesis for a 10th-grade biology class presentation. Use a friendly and educational tone suitable for classmates. Structure the explanation in 3-4 short paragraphs covering: what photosynthesis is, where it happens, and why it matters. Keep the total length under 200 words.',
+            rubric: ZERO_SHOT_RUBRIC,
           },
           3: {
             title: 'Refinement',
-            task: 'Task: Refine your previous prompt. Add a specific constraint to exclude any mention of "sunlight" but still explain the process accurately (e.g., for a follow-up quiz question).',
+            task: 'Task: Refine your previous prompt. Add constraints so the explanation fits on a single presentation slide, uses exactly 3 bullet points, and stays accessible to classmates who are new to the topic.',
+            referencePrompt: 'Explain photosynthesis for a single presentation slide aimed at 10th-grade classmates who are new to biology. Use exactly 3 bullet points. Each bullet should be one sentence maximum. Avoid technical jargon and use everyday language. Include one simple analogy to help understanding.',
+            rubric: ZERO_SHOT_RUBRIC,
           },
         },
       },
@@ -61,10 +95,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Write a prompt to generate a rubric for evaluating student essays (e.g., argumentative or analytical). Ensure your prompt defines the criteria, performance levels, and how the rubric will be used (e.g., peer review vs. summative grade).',
+            referencePrompt: 'Create a 4-point rubric for evaluating 9th-grade argumentative essays. Include these criteria: thesis clarity, use of evidence, logical organization, and counterargument handling. For each criterion, provide descriptors for Excellent (4), Proficient (3), Developing (2), and Beginning (1). This rubric will be used for summative grading. Format as a table.',
+            rubric: ZERO_SHOT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your rubric prompt. Add a constraint so the rubric explicitly excludes "grammar and spelling" from the main criteria but includes a separate section for "clarity and organization."',
+            referencePrompt: 'Create a 4-point rubric for evaluating 9th-grade argumentative essays. Main criteria: thesis clarity, use of evidence, and counterargument handling. Explicitly exclude grammar and spelling from the main scoring. Add a separate section titled "Clarity and Organization" with its own 4-point scale. For each criterion, provide descriptors for Excellent (4), Proficient (3), Developing (2), and Beginning (1). Format as a table with clear section headers.',
+            rubric: ZERO_SHOT_RUBRIC,
           },
         },
       },
@@ -92,10 +130,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Write a prompt to draft a short project update email for your manager. Ensure your prompt is specific (project name, timeframe), sets the tone, defines what to include (e.g., progress, blockers, next steps), and any constraints (length, no attachments).',
+            referencePrompt: 'Draft a project update email to my manager about the Q1 Marketing Dashboard project for the week of March 10-14. Use a professional but concise tone. Include: current progress percentage, one key accomplishment this week, any blockers, and next steps for the coming week. Keep the email under 150 words. No attachments needed.',
+            rubric: ZERO_SHOT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your previous prompt. Add a constraint so the update must be readable in under 60 seconds and must highlight exactly one ask or decision needed from your manager.',
+            referencePrompt: 'Draft a project update email to my manager about the Q1 Marketing Dashboard project for the week of March 10-14. Use a professional but concise tone. Structure for 60-second readability: start with a one-sentence status summary, then 3 bullet points (progress, blocker, next step). End with exactly one clear ask or decision needed from my manager, highlighted in bold. Maximum 100 words total.',
+            rubric: ZERO_SHOT_RUBRIC,
           },
         },
       },
@@ -107,8 +149,8 @@ export const MODULES: Module[] = [
     description: 'Providing a few examples to guide the AI\'s output format or style.',
     byPersona: {
       Student: {
-        badExample: 'Classify this as easy or hard: "Find the derivative of x^2."',
-        goodExample: 'Type: "Solve for x: 2x + 3 = 7" Difficulty: Easy. Type: "Prove the quadratic formula." Difficulty: Hard. Type: "Find the derivative of x^2." Difficulty:',
+        badExample: 'These are easy: "2+2". These are hard: "Solve the system of equations." Now classify: "Write an essay on symbolism."',
+        goodExample: 'Task: "Summarize chapter 1" Type: Reading. Task: "Solve problem 5" Type: Math. Task: "Write an essay on symbolism" Type:',
         instruction: '### How to write a good Few-shot prompt:\n1. **Consistency is Key:** Use the exact same format for every example.\n2. **Label Clearly:** Use labels like "Input:" and "Output:" or "Q:" and "A:".\n3. **Diverse Examples:** Provide a range of examples (e.g., positive, negative, and neutral).\n4. **End with a Trigger:** Finish with a trailing label (like "Output:") to signal the AI to start.',
         levels: {
           1: {
@@ -130,10 +172,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Create a few-shot prompt to classify study tips as "Time Management", "Note-taking", or "Test Prep". Provide at least 3 examples in a consistent format (e.g., Tip: ... Category: ...).',
+            referencePrompt: 'Tip: "Break your study session into 25-minute blocks with 5-minute breaks."\nCategory: Time Management\n\nTip: "Use different colored highlighters for main ideas vs. supporting details."\nCategory: Note-taking\n\nTip: "Practice with past exams under timed conditions."\nCategory: Test Prep\n\nTip: "Review your notes within 24 hours of class."\nCategory:',
+            rubric: FEW_SHOT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your few-shot prompt to also handle "Group Study" as a category. Add at least one example for this new category while keeping the same format.',
+            referencePrompt: 'Tip: "Break your study session into 25-minute blocks with 5-minute breaks."\nCategory: Time Management\n\nTip: "Use different colored highlighters for main ideas vs. supporting details."\nCategory: Note-taking\n\nTip: "Practice with past exams under timed conditions."\nCategory: Test Prep\n\nTip: "Assign each group member a section to teach the others."\nCategory: Group Study\n\nTip: "Create a shared study guide with your classmates."\nCategory:',
+            rubric: FEW_SHOT_RUBRIC,
           },
         },
       },
@@ -161,10 +207,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Create a few-shot prompt to classify student feedback comments as "Content", "Organization", or "Mechanics". Provide at least 3 examples in a consistent format for use in evaluation or comment banks.',
+            referencePrompt: 'Feedback: "Your thesis statement needs more specificity about your main argument."\nCategory: Content\n\nFeedback: "The transition between paragraphs 2 and 3 is unclear."\nCategory: Organization\n\nFeedback: "Watch your subject-verb agreement in the conclusion."\nCategory: Mechanics\n\nFeedback: "Your supporting evidence doesn\'t directly connect to your claim."\nCategory:',
+            rubric: FEW_SHOT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your few-shot prompt to also handle "Citation" as a category. Add an example for this new category so you can use it in rubric or feedback automation.',
+            referencePrompt: 'Feedback: "Your thesis statement needs more specificity about your main argument."\nCategory: Content\n\nFeedback: "The transition between paragraphs 2 and 3 is unclear."\nCategory: Organization\n\nFeedback: "Watch your subject-verb agreement in the conclusion."\nCategory: Mechanics\n\nFeedback: "You need to include page numbers in your in-text citations."\nCategory: Citation\n\nFeedback: "The quote on page 2 is missing its source attribution."\nCategory:',
+            rubric: FEW_SHOT_RUBRIC,
           },
         },
       },
@@ -192,10 +242,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Create a few-shot prompt to classify support tickets or customer emails as "Billing", "Technical", or "General". Provide at least 3 examples in a consistent format.',
+            referencePrompt: 'Ticket: "I was charged twice for my subscription this month."\nCategory: Billing\n\nTicket: "The app crashes whenever I try to upload a file larger than 10MB."\nCategory: Technical\n\nTicket: "What are your business hours?"\nCategory: General\n\nTicket: "My payment method was declined but I have sufficient funds."\nCategory:',
+            rubric: FEW_SHOT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your few-shot prompt to also handle "Shipping" issues. Add an example for this new category.',
+            referencePrompt: 'Ticket: "I was charged twice for my subscription this month."\nCategory: Billing\n\nTicket: "The app crashes whenever I try to upload a file larger than 10MB."\nCategory: Technical\n\nTicket: "What are your business hours?"\nCategory: General\n\nTicket: "My package shows delivered but I never received it."\nCategory: Shipping\n\nTicket: "Can I change the delivery address for my pending order?"\nCategory:',
+            rubric: FEW_SHOT_RUBRIC,
           },
         },
       },
@@ -230,10 +284,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Write a prompt so the AI solves a logic puzzle about planning a study schedule (e.g., 3 subjects in 3 time slots with constraints). Ensure the AI shows its reasoning steps so you can check the logic.',
+            referencePrompt: 'I need to schedule 3 subjects (Math, English, Science) into 3 time slots (9am, 11am, 2pm). Constraints: Math cannot be at 2pm, and English must come before Science. Think step by step: First, list what we know. Second, try placing each subject. Third, check if all constraints are satisfied. Show your reasoning for each step.',
+            rubric: COT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your CoT prompt for a harder version: 5 subjects, one must be in the morning, and one subject cannot be right after another. Ask the AI to show each step and then verify no constraint is broken.',
+            referencePrompt: 'Schedule 5 subjects (Math, English, Science, History, Art) into 5 time slots (8am, 9am, 11am, 1pm, 3pm). Constraints: (1) Math must be in the morning (8am or 9am), (2) History cannot be immediately after Science, (3) Art must be in the afternoon. Think step by step: First, identify fixed placements from constraints. Second, place remaining subjects one by one. Third, verify each constraint is satisfied. Finally, double-check by listing the final schedule and confirming no rules are broken.',
+            rubric: COT_RUBRIC,
           },
         },
       },
@@ -261,10 +319,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Write a prompt so the AI designs an assessment plan for a unit (e.g., what to assess, when, and how). Ensure the AI shows its reasoning step by step (e.g., learning goals first, then evidence, then task type).',
+            referencePrompt: 'Design an assessment plan for a 2-week unit on the American Revolution for 8th graders. Think step by step: First, identify 3 key learning objectives for this unit. Second, for each objective, determine what evidence would show mastery. Third, choose appropriate assessment types (formative or summative) for each. Fourth, create a timeline showing when each assessment occurs. Show your reasoning at each step.',
+            rubric: COT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your CoT prompt so the AI also explains how to differentiate the same assessment for struggling vs. advanced students, showing each step of the reasoning.',
+            referencePrompt: 'Design an assessment plan for a 2-week unit on the American Revolution for 8th graders with differentiation. Think step by step: First, identify 3 key learning objectives. Second, determine evidence of mastery for each. Third, choose assessment types and create a timeline. Fourth, for each assessment, explain modifications for struggling learners (scaffolds, reduced complexity) and extensions for advanced learners (deeper analysis, additional challenges). Finally, verify that all versions still measure the same core objectives. Show reasoning at each step.',
+            rubric: COT_RUBRIC,
           },
         },
       },
@@ -292,10 +354,14 @@ export const MODULES: Module[] = [
           2: {
             title: 'Application',
             task: 'Task: Write a prompt to solve a workplace logic puzzle (e.g., scheduling 3 people across 3 projects with constraints, or prioritizing tasks given deadlines and dependencies). Ensure the AI shows its reasoning steps.',
+            referencePrompt: 'Assign 3 team members (Alice, Bob, Carol) to 3 projects (Website, Mobile App, API). Constraints: Alice has frontend expertise so she must work on Website or Mobile App. Bob cannot work on the same project type as last quarter (he did API). Carol is the only one with backend certification required for API. Think step by step: First, identify any forced assignments from constraints. Second, assign remaining people. Third, verify all constraints are satisfied.',
+            rubric: COT_RUBRIC,
           },
           3: {
             title: 'Refinement',
             task: 'Task: Refine your CoT prompt to solve a more complex version: 5 people in a race, and one person finished twice as fast as another. Ask the AI to show each step and then verify the answer.',
+            referencePrompt: '5 runners (A, B, C, D, E) finished a race. Clues: (1) A finished twice as fast as D, (2) B finished immediately after C, (3) E did not finish first or last, (4) C finished before A. Think step by step: First, establish what "twice as fast" means for relative positions. Second, map out the constraints as relationships. Third, try possible orderings that satisfy all clues. Fourth, verify the final order against each clue. Show your work and explain any dead ends you encounter.',
+            rubric: COT_RUBRIC,
           },
         },
       },

@@ -1,4 +1,4 @@
-export type UserBackground = 'Student' | 'Teacher' | 'Professional';
+export type UserBackground = 'Student' | 'Teacher' | 'Working Professional';
 
 export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
 

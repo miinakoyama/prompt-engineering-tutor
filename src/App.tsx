@@ -55,6 +55,18 @@ export default function App() {
     startModule('Zero-shot', bg);
   };
 
+  const handleReset = () => {
+    setBackground(null);
+    setLogs([]);
+    setCurrentTechnique('Zero-shot');
+    setCurrentLevel(1);
+    setInputValue('');
+    setPredictionValue('');
+    setIsWaitingForPrediction(false);
+    setIsWaitingForResult(false);
+    setIsModuleIntro(false);
+  };
+
   const startModule = (tech: Technique, persona?: UserBackground) => {
     const module = MODULES.find(m => m.id === tech)!;
     const content = module.byPersona[persona ?? background!];
@@ -217,13 +229,18 @@ export default function App() {
       {/* Header - Always visible */}
       <header className="h-16 border-b border-slate-100 flex items-center justify-between px-10 shrink-0 bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <h2 className="font-serif text-2xl font-light tracking-tight gradient-text">Mentor</h2>
-          </div>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="flex items-center gap-2 cursor-pointer"
+            aria-label="Return to the home screen"
+          >
+            <h2 className="font-serif text-2xl font-light tracking-tight gradient-text">Prompt Mentor</h2>
+          </button>
           {background && (
             <>
               <div className="h-4 w-px bg-slate-200" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
                 {currentTechnique} <span className="mx-2 text-slate-200">|</span> Level {currentLevel}
               </p>
             </>
@@ -245,16 +262,16 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-md w-full p-8 text-center"
+            className="max-w-2xl w-full p-8 text-center"
           >
             <div className="mb-12">
-              <h1 className="text-6xl font-serif font-light mb-2 tracking-tight gradient-text">Mentor</h1>
-              <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-[10px]">Prompt Engineering</p>
+              <h1 className="text-5xl sm:text-6xl font-serif font-light mb-3 tracking-tight gradient-text whitespace-nowrap">Prompt Mentor</h1>
+              <p className="text-slate-600 font-bold uppercase tracking-[0.24em] text-xs">Learn to Write Better Prompts</p>
             </div>
             
             <div className="space-y-4">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Select Your Path</p>
-              {(['Student', 'Teacher', 'Professional'] as UserBackground[]).map((bg) => (
+              <p className="text-sm font-bold text-slate-600 uppercase tracking-[0.18em] mb-6">Choose Your Background</p>
+              {(['Student', 'Teacher', 'Working Professional'] as UserBackground[]).map((bg) => (
                 <button
                   key={bg}
                   onClick={() => handleBackgroundSelect(bg)}

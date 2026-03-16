@@ -68,7 +68,7 @@ export const MODULES: Module[] = [
           },
         },
       },
-      Professional: {
+      'Working Professional': {
         badExample: 'Write a report.',
         goodExample: 'Write a 1-page executive summary of our Q3 sales results for the board. Include: top 3 wins, top 2 risks, and one recommended action. Use a formal tone and avoid jargon. End with a single bullet list of key metrics.',
         instruction: '### How to write a good Zero-shot prompt:\n1. **Be Specific:** Clearly define the topic, length, and format.\n2. **Set the Tone:** Specify if you want it to be professional, witty, or poetic.\n3. **Define the Audience:** Tell the AI who the content is for.\n4. **Add Constraints:** Mention what to include or exclude.',
@@ -168,7 +168,7 @@ export const MODULES: Module[] = [
           },
         },
       },
-      Professional: {
+      'Working Professional': {
         badExample: 'Classify this movie as good or bad: "The acting was superb."',
         goodExample: 'Input: "I loved it!" Output: Positive. Input: "It was okay." Output: Neutral. Input: "The acting was superb." Output:',
         instruction: '### How to write a good Few-shot prompt:\n1. **Consistency is Key:** Use the exact same format for every example.\n2. **Label Clearly:** Use labels like "Input:" and "Output:" or "Q:" and "A:".\n3. **Diverse Examples:** Provide a range of examples (e.g., positive, negative, and neutral).\n4. **End with a Trigger:** Finish with a trailing label (like "Output:") to signal the AI to start.',
@@ -268,7 +268,7 @@ export const MODULES: Module[] = [
           },
         },
       },
-      Professional: {
+      'Working Professional': {
         badExample: 'What is 15 * 12?',
         goodExample: 'To find 15 * 12, first multiply 15 * 10 = 150. Then multiply 15 * 2 = 30. Finally, add 150 + 30 = 180. Now, what is 24 * 11?',
         instruction: '### How to write a good Chain-of-Thought prompt:\n1. **Use Triggers:** Phrases like "Let\'s think step by step" or "Show your reasoning" are powerful.\n2. **Decompose Tasks:** Break complex problems into smaller, logical sub-tasks.\n3. **Provide a Path:** Sometimes showing one example of the reasoning process helps the AI follow suit.\n4. **Verify Steps:** Ask the AI to double-check its own logic at the end.',

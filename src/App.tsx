@@ -14,6 +14,7 @@ import {
   AssessmentRecordPayload,
   AssessmentScoreSet,
   AssessmentTask,
+  AssessmentTaskScore,
   AssessmentTaskId,
   FlowStage,
   LogEntry,
@@ -331,14 +332,38 @@ export default function App() {
     setPosttestAnswers(updater);
   };
 
+  const formatCriteriaList = (rubric: Rubric) =>
+    rubric.criteria
+      .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
+      .join("\n");
+
+  const formatScoreJsonTemplate = (rubric: Rubric) =>
+    rubric.criteria
+      .map((criterion) => `    "${criterion.id}": { "met": true_or_false }`)
+      .join(",\n");
+
+  const createFallbackFeedbackScore = (rubric: Rubric): FeedbackScore => ({
+    totalScore: 0,
+    maxScore: rubric.criteria.length,
+    grade: "red",
+    criteriaScores: rubric.criteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.label,
+      score: 0,
+      reason: "",
+    })),
+  });
+
+  const parseOrFallbackFeedbackScore = (response: string, rubric: Rubric) =>
+    parseGradingResponse(response, rubric) || createFallbackFeedbackScore(rubric);
+
   const buildPromptScoringRequest = (
     task: AssessmentTask,
     learnerPrompt: string,
     rubric: Rubric,
   ) => {
-    const criteriaList = rubric.criteria
-      .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
-      .join("\n");
+    const criteriaList = formatCriteriaList(rubric);
+    const scoreJsonTemplate = formatScoreJsonTemplate(rubric);
 
     return `You are a prompt-writing evaluator.
 
@@ -362,7 +387,7 @@ For each criterion, return met true/false.
 Respond with ONLY valid JSON:
 {
   "scores": {
-${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\n")}
+${scoreJsonTemplate}
   },
   "feedback": "1-2 concise evaluator notes."
 }`;
@@ -374,9 +399,8 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     rationale: string,
   ) => {
     const rubric = METHOD_RATIONALE_RUBRIC;
-    const criteriaList = rubric.criteria
-      .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
-      .join("\n");
+    const criteriaList = formatCriteriaList(rubric);
+    const scoreJsonTemplate = formatScoreJsonTemplate(rubric);
 
     return `You are evaluating method selection for prompt engineering.
 
@@ -401,10 +425,46 @@ ${criteriaList}
 Respond with ONLY valid JSON:
 {
   "scores": {
-${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\n")}
+${scoreJsonTemplate}
   },
   "feedback": "1-2 concise evaluator notes."
 }`;
+  };
+
+  const gradeSingleAssessmentTask = async (
+    task: AssessmentTask,
+    answer: AssessmentAnswer,
+  ): Promise<AssessmentTaskScore> => {
+    const promptRubric =
+      task.requiresMethodSelection && answer.method
+        ? getRubricForMethod(answer.method)
+        : task.rubric;
+
+    const promptScoreText = await callGeminiWithRetry(
+      buildPromptScoringRequest(task, answer.prompt, promptRubric),
+    );
+    const promptScore = parseOrFallbackFeedbackScore(promptScoreText, promptRubric);
+
+    let methodRationaleScore: FeedbackScore | undefined;
+    if (task.requiresMethodSelection && answer.method) {
+      const methodScoreText = await callGeminiWithRetry(
+        buildMethodRationaleScoringRequest(
+          task,
+          answer.method,
+          answer.rationale || "",
+        ),
+      );
+      methodRationaleScore = parseOrFallbackFeedbackScore(
+        methodScoreText,
+        METHOD_RATIONALE_RUBRIC,
+      );
+    }
+
+    return {
+      taskId: task.id,
+      promptScore,
+      methodRationaleScore,
+    };
   };
 
   const gradeAssessmentPhase = async (
@@ -413,49 +473,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     answers: AssessmentAnswers,
   ): Promise<AssessmentScoreSet> => {
     const taskScores = await Promise.all(
-      tasks.map(async (task) => {
-        const answer = answers[task.id];
-        const promptRubric =
-          task.requiresMethodSelection && answer.method
-            ? getRubricForMethod(answer.method)
-            : task.rubric;
-
-        const promptScoreText = await callGeminiWithRetry(
-          buildPromptScoringRequest(task, answer.prompt, promptRubric),
-        );
-        const promptScore =
-          parseGradingResponse(promptScoreText, promptRubric) || {
-            totalScore: 0,
-            maxScore: promptRubric.criteria.length,
-            grade: "red" as const,
-            criteriaScores: promptRubric.criteria.map((criterion) => ({
-              id: criterion.id,
-              label: criterion.label,
-              score: 0 as const,
-              reason: "",
-            })),
-          };
-
-        let methodRationaleScore: FeedbackScore | undefined;
-        if (task.requiresMethodSelection && answer.method) {
-          const methodScoreText = await callGeminiWithRetry(
-            buildMethodRationaleScoringRequest(
-              task,
-              answer.method,
-              answer.rationale || "",
-            ),
-          );
-          methodRationaleScore =
-            parseGradingResponse(methodScoreText, METHOD_RATIONALE_RUBRIC) ||
-            undefined;
-        }
-
-        return {
-          taskId: task.id,
-          promptScore,
-          methodRationaleScore,
-        };
-      }),
+      tasks.map((task) => gradeSingleAssessmentTask(task, answers[task.id])),
     );
 
     const totalScore = taskScores.reduce((sum, taskScore) => {

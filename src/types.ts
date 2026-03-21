@@ -1,8 +1,8 @@
-export type UserBackground = 'Student' | 'Teacher' | 'Working Professional';
+export type UserBackground = 'Academic Setting' | 'Working Professional';
 
 export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
 
-export type Level = 1 | 2 | 3;
+export type Level = 1 | 2;
 
 export type PendingAction =
   | { kind: 'level'; level: Level }
@@ -38,7 +38,6 @@ export interface LogEntry {
   submittedPrompt?: string;
   title?: string;
   task?: string;
-  previousPrompt?: string;
   reviewType?: 'choice' | 'feedback';
   comparisonBad?: string;
   comparisonGood?: string;

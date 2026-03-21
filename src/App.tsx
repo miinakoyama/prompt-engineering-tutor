@@ -139,10 +139,6 @@ const EMPTY_PROGRESS: Record<Technique, Level[]> = {
   "Chain-of-Thought": [],
 };
 
-function getPromptKey(technique: Technique, level: Level) {
-  return `${technique}-${level}`;
-}
-
 export default function App() {
   const [background, setBackground] = useState<UserBackground | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -156,9 +152,6 @@ export default function App() {
   );
   const [completedLevels, setCompletedLevels] =
     useState<Record<Technique, Level[]>>(EMPTY_PROGRESS);
-  const [promptHistory, setPromptHistory] = useState<Record<string, string>>(
-    {},
-  );
   const [expandedResults, setExpandedResults] = useState<
     Record<string, boolean>
   >({});
@@ -240,7 +233,6 @@ export default function App() {
   const handleBackgroundSelect = (selectedBackground: UserBackground) => {
     setBackground(selectedBackground);
     setCompletedLevels(EMPTY_PROGRESS);
-    setPromptHistory({});
     setExpandedResults({});
     setPendingAction(null);
     startModule("Zero-shot", selectedBackground);
@@ -255,7 +247,6 @@ export default function App() {
     setIsModuleIntro(false);
     setPendingAction(null);
     setCompletedLevels(EMPTY_PROGRESS);
-    setPromptHistory({});
     setExpandedResults({});
     setFocusLogId(null);
   };
@@ -266,7 +257,6 @@ export default function App() {
     }
 
     setCompletedLevels(EMPTY_PROGRESS);
-    setPromptHistory({});
     setExpandedResults({});
     setPendingAction(null);
     startModule("Zero-shot", background);
@@ -279,10 +269,6 @@ export default function App() {
 
     const module = MODULES.find((item) => item.id === currentTechnique)!;
     const levelData = module.byPersona[background].levels[level];
-    const previousPrompt =
-      level === 3
-        ? promptHistory[getPromptKey(currentTechnique, 2)]
-        : undefined;
 
     setCurrentLevel(level);
     setPendingAction(null);
@@ -295,7 +281,6 @@ export default function App() {
       technique: currentTechnique,
       title: `Level ${level}: ${levelData.title}`,
       task: levelData.task,
-      previousPrompt,
     });
 
     setFocusLogId(logId);
@@ -363,7 +348,7 @@ export default function App() {
     setFocusLogId(instructionLogId);
 
     const nextLevel = (currentLevel + 1) as Level;
-    if (nextLevel <= 3) {
+    if (nextLevel <= 2) {
       setPendingAction({ kind: "level", level: nextLevel });
     }
   };
@@ -387,11 +372,6 @@ export default function App() {
         return log;
       }),
     );
-
-    setPromptHistory((prev) => ({
-      ...prev,
-      [getPromptKey(activeTechnique, activeLevel)]: prompt,
-    }));
 
     setPendingAction(null);
     setIsWaitingForResult(true);
@@ -478,7 +458,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
       markLevelComplete(activeTechnique, activeLevel);
 
       const nextLevel = (activeLevel + 1) as Level;
-      if (nextLevel <= 3) {
+      if (nextLevel <= 2) {
         setPendingAction({ kind: "level", level: nextLevel });
         return;
       }
@@ -527,7 +507,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     (sum, levels) => sum + levels.length,
     0,
   );
-  const totalExerciseCount = MODULES.length * 3;
+  const totalExerciseCount = MODULES.length * 2;
   const progressPercent = (completedExerciseCount / totalExerciseCount) * 100;
 
   const getPendingActionLabel = () => {
@@ -581,7 +561,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
             >
               <div className="flex items-center gap-3">
                 <div className="flex gap-1">
-                  {[1, 2, 3].map((level) => {
+                  {[1, 2].map((level) => {
                     const typedLevel = level as Level;
                     const isComplete = completed.includes(typedLevel);
                     const isCurrentStep =
@@ -610,7 +590,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                 >
                   {module.id}
                 </p>
-                {completed.length === 3 && (
+                {completed.length === 2 && (
                   <span className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-600">
                     ✓
                   </span>
@@ -681,8 +661,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
               </p>
               {(
                 [
-                  "Student",
-                  "Teacher",
+                  "Academic Setting",
                   "Working Professional",
                 ] as UserBackground[]
               ).map((item) => (
@@ -816,16 +795,6 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                               {log.task}
                             </p>
 
-                            {log.previousPrompt && (
-                              <div className="space-y-3 pt-4">
-                                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                                  Your Previous Prompt
-                                </p>
-                                <div className="p-5 rounded-xl bg-slate-50 border border-slate-100 font-mono text-base text-slate-700 leading-relaxed whitespace-pre-line">
-                                  {log.previousPrompt}
-                                </div>
-                              </div>
-                            )}
                           </div>
 
                           {log.level === 1 && (
@@ -1148,7 +1117,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                             </h3>
                             <p className="text-lg text-slate-600 leading-relaxed">
                               You practiced the three core techniques in this
-                              tutor and completed all 9 exercises.
+                              tutor and completed all 6 exercises.
                             </p>
                           </div>
 

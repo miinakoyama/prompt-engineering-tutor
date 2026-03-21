@@ -453,10 +453,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
 }`;
 
       const gradingResponse = await callGeminiWithRetry(gradingPrompt);
-      const feedbackScore = parseGradingResponse(
-        gradingResponse,
-        rubric,
-      );
+      const feedbackScore = parseGradingResponse(gradingResponse, rubric);
 
       let feedbackText = "";
       try {
@@ -692,10 +689,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                 Choose Your Background
               </p>
               {(
-                [
-                  "Academic Setting",
-                  "Working Professional",
-                ] as UserBackground[]
+                ["Academic Setting", "Working Professional"] as UserBackground[]
               ).map((item) => (
                 <button
                   key={item}
@@ -763,7 +757,11 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                   /^Task:\s*(.+)\nTechnique:\s*(.+)\nPrompt:\n([\s\S]*)$/,
                                 );
                                 if (!match) {
-                                  return { task: "", technique: "", prompt: text };
+                                  return {
+                                    task: "",
+                                    technique: "",
+                                    prompt: text,
+                                  };
                                 }
                                 return {
                                   task: match[1].trim(),
@@ -773,11 +771,23 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                               };
 
                               const badParsed = isTechniqueSelectionContrast
-                                ? parseTechniqueSelectionExample(log.comparisonBad)
-                                : { task: "", technique: "", prompt: log.comparisonBad };
+                                ? parseTechniqueSelectionExample(
+                                    log.comparisonBad,
+                                  )
+                                : {
+                                    task: "",
+                                    technique: "",
+                                    prompt: log.comparisonBad,
+                                  };
                               const goodParsed = isTechniqueSelectionContrast
-                                ? parseTechniqueSelectionExample(log.comparisonGood)
-                                : { task: "", technique: "", prompt: log.comparisonGood };
+                                ? parseTechniqueSelectionExample(
+                                    log.comparisonGood,
+                                  )
+                                : {
+                                    task: "",
+                                    technique: "",
+                                    prompt: log.comparisonGood,
+                                  };
                               const sharedTask =
                                 badParsed.task &&
                                 badParsed.task === goodParsed.task
@@ -793,20 +803,21 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                     </span>
                                     <div className="h-px flex-1 bg-slate-100" />
                                   </div>
-                                  {isTechniqueSelectionContrast && sharedTask && (
-                                    <div className="p-5 rounded-xl border border-slate-200 bg-white shadow-sm">
-                                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">
-                                        Task
-                                      </p>
-                                      <p className="text-slate-700 text-base leading-relaxed font-medium">
-                                        {sharedTask}
-                                      </p>
-                                    </div>
-                                  )}
+                                  {isTechniqueSelectionContrast &&
+                                    sharedTask && (
+                                      <div className="p-5 rounded-xl border border-slate-200 bg-white shadow-sm">
+                                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">
+                                          Task
+                                        </p>
+                                        <p className="text-slate-700 text-base leading-relaxed font-medium">
+                                          {sharedTask}
+                                        </p>
+                                      </div>
+                                    )}
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
                                       <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                                        Ineffective
+                                        Ineffective Prompt
                                       </span>
                                       {isTechniqueSelectionContrast &&
                                         badParsed.technique && (
@@ -820,7 +831,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                     </div>
                                     <div className="p-6 rounded-2xl bg-white border border-brand-pink/10 shadow-sm space-y-3">
                                       <span className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
-                                        Effective
+                                        Effective Prompt
                                       </span>
                                       {isTechniqueSelectionContrast &&
                                         goodParsed.technique && (
@@ -883,7 +894,6 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                             <p className="text-3xl font-serif font-light text-slate-900 leading-relaxed whitespace-pre-line">
                               {log.task}
                             </p>
-
                           </div>
 
                           {log.level === 1 && (

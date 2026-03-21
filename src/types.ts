@@ -139,7 +139,14 @@ export interface AssessmentSubmission {
 }
 
 export interface AssessmentRecordPayload {
+  studentUsername: string;
   background: UserBackground;
+  sessionId?: string;
+  durations: {
+    pretestSec: number;
+    posttestSec: number;
+    courseSec: number;
+  };
   preSurvey: {
     skillLevel: string;
     confidence: string;

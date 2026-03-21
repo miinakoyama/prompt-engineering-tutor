@@ -6,15 +6,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight, Home, RotateCcw, Send } from "lucide-react";
-import { GoogleGenAI } from "@google/genai";
 import {
   AssessmentAnswer,
   AssessmentAnswers,
   AssessmentPhase,
-  AssessmentRecordPayload,
-  AssessmentScoreSet,
   AssessmentTask,
-  AssessmentTaskScore,
   AssessmentTaskId,
   FlowStage,
   LogEntry,
@@ -24,7 +20,6 @@ import {
   Level,
   UserBackground,
   FeedbackScore,
-  CriterionScore,
   Rubric,
 } from "./types";
 import {
@@ -41,14 +36,21 @@ import {
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import ReactMarkdown from "react-markdown";
+import {
+  createSession,
+  fetchAdminData,
+  fetchAdminExport,
+  gradeLearning,
+  logEvent,
+  runAdminGrading,
+  saveAttempt,
+  submitAssessment,
+  updateSession,
+} from "./lib/apiClient";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 
 function getRubricForTechnique(technique: Technique): Rubric {
   switch (technique) {
@@ -82,83 +84,6 @@ function getRubricForMethod(method: PromptingMethod): Rubric {
   }
 }
 
-function parseGradingResponse(
-  response: string,
-  rubric: Rubric,
-): FeedbackScore | null {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const criteriaScores: CriterionScore[] = rubric.criteria.map(
-      (criterion) => {
-        const score = parsed.scores?.[criterion.id];
-        return {
-          id: criterion.id,
-          label: criterion.label,
-          score: score?.met ? 1 : 0,
-          reason: score?.reason || "",
-        };
-      },
-    );
-
-    const totalScore = criteriaScores.reduce((sum, c) => sum + c.score, 0);
-    const maxScore = criteriaScores.length;
-
-    let grade: "green" | "yellow" | "red";
-    if (totalScore >= rubric.thresholds.green) {
-      grade = "green";
-    } else if (totalScore >= rubric.thresholds.yellow) {
-      grade = "yellow";
-    } else {
-      grade = "red";
-    }
-
-    return {
-      totalScore,
-      maxScore,
-      grade,
-      criteriaScores,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function callGeminiWithRetry(
-  prompt: string,
-  maxRetries = 3,
-): Promise<string> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt,
-      });
-      return response.text || "No response received.";
-    } catch (error) {
-      lastError = error as Error;
-      const errorMessage = String(error);
-
-      if (
-        errorMessage.includes("429") ||
-        errorMessage.includes("RESOURCE_EXHAUSTED")
-      ) {
-        const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000;
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  throw lastError || new Error("Failed after retries");
-}
-
 const TECHNIQUE_SUMMARIES: Record<Technique, string> = {
   "Zero-shot":
     "Write one clear instruction with the right audience, format, and constraints.",
@@ -179,10 +104,11 @@ const EMPTY_PROGRESS: Record<Technique, Level[]> = {
 
 const ASSESSMENT_TASK_IDS: AssessmentTaskId[] = [1, 2, 3, 4];
 const SKILL_LEVEL_OPTIONS = [
-  "Beginner",
-  "Intermediate",
-  "Advanced",
-  "Expert",
+  "1 - Almost none (first time)",
+  "2 - A little (a few times)",
+  "3 - Sometimes (monthly)",
+  "4 - Often (weekly)",
+  "5 - Very experienced",
 ];
 const CONFIDENCE_OPTIONS = [
   "Not confident",
@@ -236,8 +162,19 @@ function getFlowStageFromPath(pathname: string): FlowStage | null {
 }
 
 export default function App() {
+  const [isAdminRoute] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const normalized = window.location.pathname.replace(/^\/+|\/+$/g, "");
+    return normalized.toLowerCase() === "admin";
+  });
   const [flowStage, setFlowStage] = useState<FlowStage>(() => {
     if (typeof window === "undefined") {
+      return "pretest";
+    }
+    const normalized = window.location.pathname.replace(/^\/+|\/+$/g, "");
+    if (normalized.toLowerCase() === "admin") {
       return "pretest";
     }
     const stageFromPath = getFlowStageFromPath(window.location.pathname);
@@ -279,7 +216,27 @@ export default function App() {
   const [preConfidence, setPreConfidence] = useState("");
   const [postConfidence, setPostConfidence] = useState("");
   const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
-  const [, setAssessmentRecords] = useState<AssessmentRecordPayload[]>([]);
+  const [studentUsername, setStudentUsername] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [courseStartedAt, setCourseStartedAt] = useState<number | null>(null);
+  const [pretestStartedAt, setPretestStartedAt] = useState<number | null>(null);
+  const [posttestStartedAt, setPosttestStartedAt] = useState<number | null>(
+    null,
+  );
+  const [questionStartedAt, setQuestionStartedAt] = useState<
+    Record<string, number>
+  >({});
+  const [usernameError, setUsernameError] = useState("");
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [adminPasscode, setAdminPasscode] = useState("");
+  const [adminAuthorized, setAdminAuthorized] = useState(false);
+  const [adminData, setAdminData] = useState<any | null>(null);
+  const [adminError, setAdminError] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminEnvFilter, setAdminEnvFilter] = useState<
+    "all" | "local" | "production"
+  >("all");
   const [deepLinkedTechnique] = useState<Technique | null>(() => {
     if (typeof window === "undefined") {
       return null;
@@ -352,6 +309,10 @@ export default function App() {
     taskId: AssessmentTaskId,
     patch: Partial<AssessmentAnswer>,
   ) => {
+    const questionKey = `${phase}-${taskId}`;
+    setQuestionStartedAt((prev) =>
+      prev[questionKey] ? prev : { ...prev, [questionKey]: Date.now() },
+    );
     const updater = (prev: AssessmentAnswers): AssessmentAnswers => ({
       ...prev,
       [taskId]: {
@@ -367,181 +328,65 @@ export default function App() {
     setPosttestAnswers(updater);
   };
 
-  const formatCriteriaList = (rubric: Rubric) =>
-    rubric.criteria
-      .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
-      .join("\n");
+  const durationSeconds = (startMs: number, endMs = Date.now()) =>
+    Math.max(0, Math.round((endMs - startMs) / 1000));
 
-  const formatScoreJsonTemplate = (rubric: Rubric) =>
-    rubric.criteria
-      .map((criterion) => `    "${criterion.id}": { "met": true_or_false }`)
-      .join(",\n");
+  const usernamePattern = /^[a-z0-9]{2,16}$/;
 
-  const createFallbackFeedbackScore = (rubric: Rubric): FeedbackScore => ({
-    totalScore: 0,
-    maxScore: rubric.criteria.length,
-    grade: "red",
-    criteriaScores: rubric.criteria.map((criterion) => ({
-      id: criterion.id,
-      label: criterion.label,
-      score: 0,
-      reason: "",
-    })),
-  });
-
-  const parseOrFallbackFeedbackScore = (response: string, rubric: Rubric) =>
-    parseGradingResponse(response, rubric) ||
-    createFallbackFeedbackScore(rubric);
-
-  const buildPromptScoringRequest = (
-    task: AssessmentTask,
-    learnerPrompt: string,
-    rubric: Rubric,
-  ) => {
-    const criteriaList = formatCriteriaList(rubric);
-    const scoreJsonTemplate = formatScoreJsonTemplate(rubric);
-
-    return `You are a prompt-writing evaluator.
-
-SCENARIO:
-${task.scenario}
-
-REQUIREMENT:
-${task.requirement}
-
-REFERENCE PROMPT:
-"""${task.referencePrompt}"""
-
-LEARNER PROMPT:
-"""${learnerPrompt}"""
-
-EVALUATION CRITERIA:
-${criteriaList}
-
-For each criterion, return met true/false.
-
-Respond with ONLY valid JSON:
-{
-  "scores": {
-${scoreJsonTemplate}
-  },
-  "feedback": "1-2 concise evaluator notes."
-}`;
-  };
-
-  const buildMethodRationaleScoringRequest = (
-    task: AssessmentTask,
-    selectedMethod: PromptingMethod,
-    rationale: string,
-  ) => {
-    const rubric = METHOD_RATIONALE_RUBRIC;
-    const criteriaList = formatCriteriaList(rubric);
-    const scoreJsonTemplate = formatScoreJsonTemplate(rubric);
-
-    return `You are evaluating method selection for prompt engineering.
-
-TASK:
-${task.requirement}
-
-REFERENCE METHOD:
-${task.referenceMethod || "N/A"}
-
-REFERENCE RATIONALE:
-${task.referenceRationale || "N/A"}
-
-LEARNER METHOD:
-${selectedMethod}
-
-LEARNER RATIONALE:
-${rationale}
-
-EVALUATION CRITERIA:
-${criteriaList}
-
-Respond with ONLY valid JSON:
-{
-  "scores": {
-${scoreJsonTemplate}
-  },
-  "feedback": "1-2 concise evaluator notes."
-}`;
-  };
-
-  const gradeSingleAssessmentTask = async (
-    task: AssessmentTask,
-    answer: AssessmentAnswer,
-  ): Promise<AssessmentTaskScore> => {
-    const promptRubric =
-      task.requiresMethodSelection && answer.method
-        ? getRubricForMethod(answer.method)
-        : task.rubric;
-
-    const promptScoreText = await callGeminiWithRetry(
-      buildPromptScoringRequest(task, answer.prompt, promptRubric),
-    );
-    const promptScore = parseOrFallbackFeedbackScore(
-      promptScoreText,
-      promptRubric,
-    );
-
-    let methodRationaleScore: FeedbackScore | undefined;
-    if (task.requiresMethodSelection && answer.method) {
-      const methodScoreText = await callGeminiWithRetry(
-        buildMethodRationaleScoringRequest(
-          task,
-          answer.method,
-          answer.rationale || "",
-        ),
+  const handleUsernameSubmit = async () => {
+    const normalized = usernameInput.trim().toLowerCase();
+    if (!usernamePattern.test(normalized)) {
+      setUsernameError(
+        "Please enter a valid Andrew ID (lowercase letters and numbers).",
       );
-      methodRationaleScore = parseOrFallbackFeedbackScore(
-        methodScoreText,
-        METHOD_RATIONALE_RUBRIC,
-      );
+      return;
     }
-
-    return {
-      taskId: task.id,
-      promptScore,
-      methodRationaleScore,
-    };
+    setIsCreatingSession(true);
+    setUsernameError("");
+    try {
+      const now = Date.now();
+      const session = await createSession({
+        username: normalized,
+        startedAt: now,
+      });
+      setStudentUsername(normalized);
+      setSessionId(session.sessionId);
+      setCourseStartedAt(now);
+      setPretestStartedAt(now);
+      setQuestionStartedAt({});
+      await logEvent({
+        sessionId: session.sessionId,
+        eventType: "session_started",
+        payload: { studentUsername: normalized },
+        timestamp: now,
+      });
+    } catch (error) {
+      setUsernameError("Failed to create session. Please try again.");
+      console.error(error);
+    } finally {
+      setIsCreatingSession(false);
+    }
   };
 
-  const gradeAssessmentPhase = async (
-    phase: AssessmentPhase,
-    tasks: AssessmentTask[],
-    answers: AssessmentAnswers,
-  ): Promise<AssessmentScoreSet> => {
-    const taskScores = await Promise.all(
-      tasks.map((task) => gradeSingleAssessmentTask(task, answers[task.id])),
-    );
-
-    const totalScore = taskScores.reduce((sum, taskScore) => {
-      return (
-        sum +
-        taskScore.promptScore.totalScore +
-        (taskScore.methodRationaleScore?.totalScore || 0)
-      );
-    }, 0);
-
-    const maxScore = taskScores.reduce((sum, taskScore) => {
-      return (
-        sum +
-        taskScore.promptScore.maxScore +
-        (taskScore.methodRationaleScore?.maxScore || 0)
-      );
-    }, 0);
-
-    return {
-      phase,
-      taskScores,
-      totalScore,
-      maxScore,
-    };
-  };
-
-  const persistAssessment = (payload: AssessmentRecordPayload) => {
-    setAssessmentRecords((prev) => [...prev, payload]);
-    console.info("Assessment data captured", payload);
+  const saveEvent = async (
+    eventType: string,
+    payload: Record<string, unknown> = {},
+    technique?: Technique,
+    level?: Level,
+  ) => {
+    if (!sessionId) return;
+    try {
+      await logEvent({
+        sessionId,
+        eventType,
+        technique,
+        level,
+        payload,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to save event", error);
+    }
   };
 
   const addLog = (entry: Omit<LogEntry, "id" | "timestamp">) => {
@@ -600,6 +445,7 @@ ${scoreJsonTemplate}
       comparisonGood: content.goodExample,
     });
     setFocusLogId(introLogId);
+    void saveEvent("module_started", { technique }, technique);
   };
 
   const handleBackgroundSelect = (selectedBackground: UserBackground) => {
@@ -609,6 +455,16 @@ ${scoreJsonTemplate}
     setExpandedResults({});
     setPendingAction(null);
     startModule(deepLinkedTechnique ?? "Zero-shot", selectedBackground);
+    if (sessionId) {
+      void updateSession({
+        sessionId,
+        background: selectedBackground,
+        flowStage: "learning",
+      }).catch((error) =>
+        console.error("Failed to update session background", error),
+      );
+      void saveEvent("background_selected", { background: selectedBackground });
+    }
   };
 
   const handleReset = () => {
@@ -631,6 +487,15 @@ ${scoreJsonTemplate}
     setPreConfidence("");
     setPostConfidence("");
     setIsSubmittingAssessment(false);
+    setStudentUsername("");
+    setUsernameInput("");
+    setSessionId(null);
+    setCourseStartedAt(null);
+    setPretestStartedAt(null);
+    setPosttestStartedAt(null);
+    setQuestionStartedAt({});
+    setUsernameError("");
+    setIsCreatingSession(false);
   };
 
   const handleRestartTrack = () => {
@@ -668,6 +533,11 @@ ${scoreJsonTemplate}
     });
 
     setFocusLogId(logId);
+    setQuestionStartedAt((prev) => ({
+      ...prev,
+      [`learning-${currentTechnique}-${level}`]: Date.now(),
+    }));
+    void saveEvent("level_started", { level }, currentTechnique, level);
   };
 
   const handleContinue = () => {
@@ -686,7 +556,19 @@ ${scoreJsonTemplate}
     }
 
     setPendingAction(null);
+    const now = Date.now();
+    setPosttestStartedAt(now);
     setFlowStage("posttest");
+    if (sessionId) {
+      void updateSession({
+        sessionId,
+        flowStage: "posttest",
+        posttestStartedAt: now,
+      }).catch((error) =>
+        console.error("Failed to update session to posttest", error),
+      );
+      void saveEvent("posttest_started", {});
+    }
   };
 
   const handleChoiceSelect = (
@@ -713,6 +595,36 @@ ${scoreJsonTemplate}
       isCorrect: choice.isCorrect,
       reviewType: "choice",
     });
+
+    const questionKey = `learning-${currentTechnique}-${currentLevel}`;
+    const startedAt = questionStartedAt[questionKey];
+    const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
+    if (sessionId) {
+      void saveAttempt({
+        sessionId,
+        phase: "learning",
+        technique: currentTechnique,
+        level: currentLevel,
+        questionKey,
+        questionTitle: `Level ${currentLevel}`,
+        selectedChoice: choice.text,
+        isCorrect: choice.isCorrect,
+        feedbackText: choice.explanation,
+        gradingStatus: "graded",
+        scoreTotal: choice.isCorrect ? 4 : 0,
+        scoreMax: 4,
+        durationSec,
+        submittedAt: Date.now(),
+      }).catch((error) =>
+        console.error("Failed to save learning choice attempt", error),
+      );
+      void saveEvent(
+        "learning_choice_submitted",
+        { isCorrect: choice.isCorrect, durationSec },
+        currentTechnique,
+        currentLevel,
+      );
+    }
 
     markLevelComplete(currentTechnique, currentLevel);
 
@@ -770,77 +682,28 @@ ${scoreJsonTemplate}
     });
 
     try {
-      const resultText = await callGeminiWithRetry(prompt);
-
       const levelData = moduleContent.levels[activeLevel];
       const selectedMethod = targetLog?.selectedMethod;
       const rubric =
         activeTechnique === "Technique Selection" && selectedMethod
           ? getRubricForMethod(selectedMethod)
           : levelData.rubric || getRubricForTechnique(activeTechnique);
-      const referencePrompt = levelData.referencePrompt || "";
-      const methodContext =
-        activeTechnique === "Technique Selection"
-          ? `\nSELECTED METHOD:\n${selectedMethod || "Not provided"}\n\nLEARNER RATIONALE:\n"""${targetLog?.selectedRationale || ""}"""\n`
-          : "";
-
-      const criteriaList = rubric.criteria
-        .map((c) => `- ${c.id}: ${c.description}`)
-        .join("\n");
-
-      const gradingPrompt = `You are a warm, encouraging prompt-writing instructor using reference-guided grading.
-
-TASK ASSIGNED TO LEARNER:
-${levelTask}
-
-REFERENCE PROMPT (gold standard):
-"""${referencePrompt}"""
-
-LEARNER'S PROMPT:
-"""${prompt}"""
-
-AI RESPONSE TO LEARNER'S PROMPT:
-"""${resultText}"""
-${methodContext}
-
-EVALUATION CRITERIA:
-${criteriaList}
-
-INSTRUCTIONS:
-1. Compare the learner's prompt against the reference prompt
-2. For each criterion, determine if the learner's prompt meets it (true/false)
-3. Write encouraging, constructive feedback based on how many criteria were met:
-   - If 3-4 met: Celebrate their success! Mention what they did well. Optionally suggest a small refinement.
-   - If 2 met: Acknowledge what's working, then kindly explain what's missing and how to improve.
-   - If 0-1 met: Be encouraging! Find something positive to say, then gently guide them on the most important thing to focus on.
-
-Respond with ONLY valid JSON in this exact format:
-{
-  "scores": {
-${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\n")}
-  },
-  "feedback": "2-3 sentences of warm, constructive feedback. Be specific about what they did well and what to improve."
-}`;
-
-      const gradingResponse = await callGeminiWithRetry(gradingPrompt);
-      const feedbackScore = parseGradingResponse(gradingResponse, rubric);
-
-      let feedbackText = "";
-      try {
-        const jsonMatch = gradingResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          feedbackText = parsed.feedback || "";
-        }
-      } catch {
-        feedbackText = "";
-      }
+      const gradingResult = await gradeLearning({
+        mode: "prompt",
+        learnerPrompt: prompt,
+        task: levelTask,
+        referencePrompt: levelData.referencePrompt || "",
+        rubric,
+        selectedMethod: selectedMethod,
+        selectedRationale: targetLog?.selectedRationale,
+      });
+      const resultText = gradingResult.generatedResponse || "";
+      const feedbackScore = gradingResult.feedbackScore;
+      const feedbackText = gradingResult.feedbackText;
 
       const reviewLogId = addLog({
         type: "review",
-        content:
-          feedbackText ||
-          "Good effort! Try adding more specific details to make your prompt clearer.",
+        content: feedbackText,
         reviewType: "feedback",
         feedbackScore: feedbackScore || undefined,
         prompt,
@@ -855,6 +718,43 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
       setIsWaitingForResult(false);
 
       markLevelComplete(activeTechnique, activeLevel);
+      const questionKey = `learning-${activeTechnique}-${activeLevel}`;
+      const startedAt = questionStartedAt[questionKey];
+      const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
+      if (sessionId) {
+        void saveAttempt({
+          sessionId,
+          phase: "learning",
+          technique: activeTechnique,
+          level: activeLevel,
+          questionKey,
+          questionTitle: `Level ${activeLevel}`,
+          promptRaw: prompt,
+          aiResponse: resultText,
+          feedbackText,
+          gradingStatus: "graded",
+          scoreTotal: feedbackScore?.totalScore,
+          scoreMax: feedbackScore?.maxScore,
+          durationSec,
+          submittedAt: Date.now(),
+          gradedAt: Date.now(),
+          selectedMethod: selectedMethod,
+          selectedRationale: targetLog?.selectedRationale,
+          criteriaScores: feedbackScore?.criteriaScores,
+        }).catch((error) =>
+          console.error("Failed to save learning prompt attempt", error),
+        );
+        void saveEvent(
+          "learning_prompt_submitted",
+          {
+            durationSec,
+            totalScore: feedbackScore?.totalScore,
+            maxScore: feedbackScore?.maxScore,
+          },
+          activeTechnique,
+          activeLevel,
+        );
+      }
 
       const nextLevel = (activeLevel + 1) as Level;
       if (nextLevel <= 2) {
@@ -916,52 +816,20 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
 
     const module = MODULES.find((item) => item.id === targetLog.technique)!;
     const levelData = module.byPersona[background].levels[targetLog.level || 2];
-    const gradingPrompt = `You are evaluating method selection for prompt engineering.
-
-TASK:
-${levelData.task}
-
-REFERENCE METHOD:
-${levelData.referenceMethod || "N/A"}
-
-REFERENCE RATIONALE:
-${levelData.referenceRationale || "N/A"}
-
-LEARNER METHOD:
-${targetLog.selectedMethod}
-
-LEARNER RATIONALE:
-${targetLog.selectedRationale}
-
-EVALUATION CRITERIA:
-${formatCriteriaList(METHOD_RATIONALE_RUBRIC)}
-
-Respond with ONLY valid JSON:
-{
-  "scores": {
-${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
-  },
-  "feedback": "2-3 sentences of concise feedback on method choice quality."
-}`;
 
     setMethodReviewingLogId(logId);
     try {
-      const gradingResponse = await callGeminiWithRetry(gradingPrompt);
-      const methodFeedbackScore = parseOrFallbackFeedbackScore(
-        gradingResponse,
-        METHOD_RATIONALE_RUBRIC,
-      );
-
-      let feedbackText = "";
-      try {
-        const jsonMatch = gradingResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          feedbackText = parsed.feedback || "";
-        }
-      } catch {
-        feedbackText = "";
-      }
+      const result = await gradeLearning({
+        mode: "method",
+        task: levelData.task,
+        referenceMethod: levelData.referenceMethod,
+        referenceRationale: levelData.referenceRationale,
+        selectedMethod: targetLog.selectedMethod,
+        selectedRationale: targetLog.selectedRationale,
+        rubric: METHOD_RATIONALE_RUBRIC,
+      });
+      const methodFeedbackScore = result.feedbackScore;
+      const feedbackText = result.feedbackText;
 
       setLogs((prev) =>
         prev.map((log) =>
@@ -977,23 +845,85 @@ ${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
             : log,
         ),
       );
+      void saveEvent(
+        "technique_selection_method_reviewed",
+        {
+          selectedMethod: targetLog.selectedMethod,
+          totalScore: methodFeedbackScore.totalScore,
+          maxScore: methodFeedbackScore.maxScore,
+        },
+        targetLog.technique,
+        targetLog.level,
+      );
     } finally {
       setMethodReviewingLogId(null);
     }
   };
 
-  const handlePretestSubmit = () => {
+  const handlePretestSubmit = async () => {
     if (
+      !sessionId ||
       !isAssessmentComplete(PRE_TEST_TASKS, pretestAnswers) ||
       !isSurveyComplete("pre")
     ) {
       return;
     }
-    setFlowStage("learning");
+
+    const submittedAt = Date.now();
+    const preDuration = pretestStartedAt
+      ? durationSeconds(pretestStartedAt, submittedAt)
+      : undefined;
+
+    const questionDurationsSec: Record<string, number> = {};
+    PRE_TEST_TASKS.forEach((task) => {
+      const key = `pre-${task.id}`;
+      const startedAt = questionStartedAt[key];
+      questionDurationsSec[String(task.id)] = startedAt
+        ? durationSeconds(startedAt, submittedAt)
+        : 0;
+    });
+
+    setIsSubmittingAssessment(true);
+    try {
+      await submitAssessment({
+        sessionId,
+        phase: "pre",
+        answers: pretestAnswers,
+        survey: {
+          skillLevel: preSkillLevel,
+          confidence: preConfidence,
+        },
+        durationSec: preDuration,
+        submittedAt,
+        questionDurationsSec,
+      });
+      await updateSession({
+        sessionId,
+        flowStage: "learning",
+        pretestCompletedAt: submittedAt,
+        pretestDurationSec: preDuration || null,
+        pretestExperienceLevel: preSkillLevel,
+        pretestConfidence: preConfidence,
+        learningStartedAt: submittedAt,
+      });
+      await saveEvent("pretest_submitted", {
+        preDuration,
+        questionDurationsSec,
+        preSkillLevel,
+        preConfidence,
+      });
+      setFlowStage("learning");
+    } catch (error) {
+      console.error("Failed to submit pretest", error);
+      setUsernameError("Failed to submit pre-test. Please try again.");
+    } finally {
+      setIsSubmittingAssessment(false);
+    }
   };
 
   const handlePosttestSubmit = async () => {
     if (
+      !sessionId ||
       !background ||
       !isAssessmentComplete(POST_TEST_TASKS, posttestAnswers) ||
       !isSurveyComplete("post")
@@ -1003,31 +933,50 @@ ${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
 
     setIsSubmittingAssessment(true);
     try {
-      const [preScores, postScores] = await Promise.all([
-        gradeAssessmentPhase("pre", PRE_TEST_TASKS, pretestAnswers),
-        gradeAssessmentPhase("post", POST_TEST_TASKS, posttestAnswers),
-      ]);
+      const submittedAt = Date.now();
+      const postDuration = posttestStartedAt
+        ? durationSeconds(posttestStartedAt, submittedAt)
+        : undefined;
+      const courseDuration = courseStartedAt
+        ? durationSeconds(courseStartedAt, submittedAt)
+        : undefined;
 
-      persistAssessment({
-        background,
-        preSurvey: {
-          skillLevel: preSkillLevel,
-          confidence: preConfidence,
-        },
-        postSurvey: {
-          confidence: postConfidence,
-        },
-        pretest: { phase: "pre", answers: pretestAnswers },
-        posttest: { phase: "post", answers: posttestAnswers },
-        scores: {
-          pretest: preScores,
-          posttest: postScores,
-        },
-        submittedAt: Date.now(),
+      const questionDurationsSec: Record<string, number> = {};
+      POST_TEST_TASKS.forEach((task) => {
+        const key = `post-${task.id}`;
+        const startedAt = questionStartedAt[key];
+        questionDurationsSec[String(task.id)] = startedAt
+          ? durationSeconds(startedAt, submittedAt)
+          : 0;
+      });
+
+      await submitAssessment({
+        sessionId,
+        phase: "post",
+        answers: posttestAnswers,
+        survey: { confidence: postConfidence },
+        durationSec: postDuration,
+        submittedAt,
+        questionDurationsSec,
+      });
+      await updateSession({
+        sessionId,
+        flowStage: "done",
+        posttestCompletedAt: submittedAt,
+        posttestDurationSec: postDuration || null,
+        completedAt: submittedAt,
+        courseDurationSec: courseDuration || null,
+        posttestConfidence: postConfidence,
+      });
+      await saveEvent("posttest_submitted", {
+        postDuration,
+        courseDuration,
+        questionDurationsSec,
+        postConfidence,
       });
       setFlowStage("done");
     } catch (error) {
-      console.error("Assessment scoring error:", error);
+      console.error("Assessment submit error:", error);
       addLog({
         type: "intro",
         content: "Failed to submit assessment data. Please try again.",
@@ -1145,6 +1094,54 @@ ${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
     tasks: AssessmentTask[],
     answers: AssessmentAnswers,
   ) => {
+    if (phase === "pre" && !sessionId) {
+      return (
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-lg w-full p-8 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-5">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-pink">
+              Student Login
+            </p>
+            <h1 className="text-3xl font-serif font-light text-slate-900">
+              Enter your Username
+            </h1>
+            <p className="text-slate-600 leading-relaxed">
+              Use your CMU Andrew ID.
+            </p>
+            <input
+              value={usernameInput}
+              onChange={(event) => {
+                setUsernameInput(event.target.value);
+                if (usernameError) setUsernameError("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !isCreatingSession) {
+                  void handleUsernameSubmit();
+                }
+              }}
+              placeholder="e.g. andrewid"
+              className="w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base"
+            />
+            {usernameError ? (
+              <p className="text-sm text-red-600">{usernameError}</p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void handleUsernameSubmit()}
+              disabled={isCreatingSession}
+              className={cn(
+                "w-full py-4 rounded-xl font-bold text-sm uppercase tracking-[0.14em] shadow-lg transition-all",
+                isCreatingSession
+                  ? "bg-slate-200 text-slate-500 cursor-not-allowed shadow-none"
+                  : "gradient-bg text-white shadow-brand-pink/20 hover:scale-[1.01]",
+              )}
+            >
+              {isCreatingSession ? "Starting..." : "Start Pre-Test"}
+            </button>
+          </div>
+        </main>
+      );
+    }
+
     const isComplete =
       isAssessmentComplete(tasks, answers) && isSurveyComplete(phase);
     const submitLabel = phase === "pre" ? "Start Learning Modules" : "Submit";
@@ -1349,8 +1346,285 @@ ${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
     );
   };
 
-  const headerStageLabel =
-    flowStage === "pretest"
+  const refreshAdminData = async () => {
+    if (!adminPasscode) {
+      return;
+    }
+    setAdminLoading(true);
+    setAdminError("");
+    try {
+      const data = await fetchAdminData(adminPasscode, 200);
+      setAdminData(data);
+      setAdminAuthorized(true);
+    } catch (error) {
+      setAdminError("Failed to load admin data. Check your passcode.");
+      console.error(error);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleRunAdminGrading = async () => {
+    if (!adminPasscode) return;
+    setAdminLoading(true);
+    setAdminError("");
+    try {
+      await runAdminGrading(adminPasscode, 50);
+      await refreshAdminData();
+    } catch (error) {
+      setAdminError("Failed to run grading.");
+      console.error(error);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleExport = async (format: "json" | "csv") => {
+    if (!adminPasscode) return;
+    try {
+      const response = await fetchAdminExport(adminPasscode, format);
+      if (format === "json") {
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `prompt-mentor-export-${Date.now()}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const csvText = await response.text();
+        const blob = new Blob([csvText], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `prompt-mentor-attempts-${Date.now()}.csv`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      setAdminError("Failed to export data.");
+      console.error(error);
+    }
+  };
+
+  const renderAdminDashboard = () => {
+    const sessions = adminData?.sessions || [];
+    const pendingAttempts = adminData?.pendingAttempts || [];
+    const attempts = adminData?.attempts || [];
+    const matchesEnvFilter = (row: { app_env?: string }) => {
+      if (adminEnvFilter === "all") {
+        return true;
+      }
+      return (row.app_env || "unknown").toLowerCase() === adminEnvFilter;
+    };
+    const filteredSessions = sessions.filter(matchesEnvFilter);
+    const filteredPendingAttempts = pendingAttempts.filter(matchesEnvFilter);
+    const filteredAttempts = attempts.filter(matchesEnvFilter);
+
+    if (!adminAuthorized) {
+      return (
+        <main className="flex-1 flex items-center justify-center p-6 bg-[#fcfcfc]">
+          <div className="max-w-lg w-full p-8 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-5">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-pink">
+              Admin Access Required
+            </p>
+            <h1 className="text-3xl font-serif font-light text-slate-900">
+              Enter Admin Passcode
+            </h1>
+            <p className="text-slate-600 leading-relaxed">
+              This dashboard includes grading tools and raw logs. Enter the
+              admin passcode to continue.
+            </p>
+            <input
+              type="password"
+              value={adminPasscode}
+              onChange={(event) => setAdminPasscode(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !adminLoading) {
+                  void refreshAdminData();
+                }
+              }}
+              placeholder="Admin passcode"
+              className="w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base"
+            />
+            {adminError ? (
+              <p className="text-sm text-red-600">{adminError}</p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void refreshAdminData()}
+              disabled={adminLoading}
+              className={cn(
+                "w-full py-4 rounded-xl font-bold text-sm uppercase tracking-[0.14em] shadow-lg transition-all",
+                adminLoading
+                  ? "bg-slate-200 text-slate-500 cursor-not-allowed shadow-none"
+                  : "gradient-bg text-white shadow-brand-pink/20 hover:scale-[1.01]",
+              )}
+            >
+              {adminLoading ? "Verifying..." : "Unlock Dashboard"}
+            </button>
+          </div>
+        </main>
+      );
+    }
+
+    return (
+      <main className="flex-1 overflow-y-auto p-6 lg:p-10 bg-[#fcfcfc]">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-4">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-pink">
+              Admin Dashboard
+            </p>
+            <p className="text-slate-600">
+              Review sessions, run post-hoc grading for pre/post attempts, and
+              export logs.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={adminEnvFilter}
+                onChange={(event) =>
+                  setAdminEnvFilter(
+                    event.target.value as "all" | "local" | "production",
+                  )
+                }
+                className="bg-white border border-slate-200 rounded-xl py-3 px-4 text-slate-700 focus:outline-none focus:border-brand-pink"
+              >
+                <option value="all">All environments</option>
+                <option value="local">local</option>
+                <option value="production">production</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void refreshAdminData()}
+                disabled={adminLoading}
+                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold"
+              >
+                {adminLoading ? "Loading..." : "Load Data"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRunAdminGrading()}
+                disabled={adminLoading || !adminAuthorized}
+                className="px-4 py-3 rounded-xl gradient-bg text-white font-semibold disabled:opacity-50"
+              >
+                Grade Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleExport("csv")}
+                disabled={!adminAuthorized}
+                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold disabled:opacity-50"
+              >
+                Export CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleExport("json")}
+                disabled={!adminAuthorized}
+                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold disabled:opacity-50"
+              >
+                Export JSON
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminAuthorized(false);
+                  setAdminData(null);
+                  setAdminError("");
+                }}
+                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold"
+              >
+                Lock
+              </button>
+            </div>
+            {adminError ? (
+              <p className="text-sm text-red-600">{adminError}</p>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-5 rounded-xl border border-slate-200 bg-white">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+                Sessions
+              </p>
+              <p className="text-2xl font-semibold text-slate-900">
+                {filteredSessions.length}
+              </p>
+            </div>
+            <div className="p-5 rounded-xl border border-slate-200 bg-white">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+                Pending Pre/Post
+              </p>
+              <p className="text-2xl font-semibold text-slate-900">
+                {filteredPendingAttempts.length}
+              </p>
+            </div>
+            <div className="p-5 rounded-xl border border-slate-200 bg-white">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+                Total Attempts
+              </p>
+              <p className="text-2xl font-semibold text-slate-900">
+                {filteredAttempts.length}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-3">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
+              Pending Attempts
+            </p>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500">
+                    <th className="py-2 pr-4">Env</th>
+                    <th className="py-2 pr-4">Session</th>
+                    <th className="py-2 pr-4">Phase</th>
+                    <th className="py-2 pr-4">Question</th>
+                    <th className="py-2 pr-4">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPendingAttempts.map((attempt: any) => (
+                    <tr key={attempt.id} className="border-t border-slate-100">
+                      <td className="py-2 pr-4">
+                        <span
+                          className={cn(
+                            "px-2 py-1 rounded-full text-xs font-semibold",
+                            (attempt.app_env || "").toLowerCase() ===
+                              "production"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-700",
+                          )}
+                        >
+                          {(attempt.app_env || "unknown").toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 font-mono text-xs">
+                        {attempt.session_id}
+                      </td>
+                      <td className="py-2 pr-4">{attempt.phase}</td>
+                      <td className="py-2 pr-4">{attempt.question_key}</td>
+                      <td className="py-2 pr-4">
+                        {new Date(attempt.submitted_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  };
+
+  const headerStageLabel = isAdminRoute
+    ? "Admin"
+    : flowStage === "pretest"
       ? "Pre-Test"
       : flowStage === "posttest"
         ? "Post-Test"
@@ -1380,6 +1654,13 @@ ${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {studentUsername ? (
+            <div className="h-8 px-4 rounded-full border border-slate-100 bg-slate-50/50 flex items-center">
+              <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                {studentUsername}
+              </span>
+            </div>
+          ) : null}
           {background && flowStage !== "pretest" ? (
             <div className="h-8 px-4 rounded-full border border-slate-100 bg-slate-50/50 flex items-center">
               <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
@@ -1390,7 +1671,9 @@ ${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
         </div>
       </header>
 
-      {flowStage === "pretest" ? (
+      {isAdminRoute ? (
+        renderAdminDashboard()
+      ) : flowStage === "pretest" ? (
         renderAssessmentScreen("pre", PRE_TEST_TASKS, pretestAnswers)
       ) : flowStage === "posttest" ? (
         renderAssessmentScreen("post", POST_TEST_TASKS, posttestAnswers)

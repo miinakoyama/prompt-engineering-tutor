@@ -39,6 +39,11 @@ export interface LogEntry {
   prompt?: string;
   generatedResponse?: string;
   selectedChoice?: string;
+  selectedMethod?: PromptingMethod;
+  selectedRationale?: string;
+  methodStepCompleted?: boolean;
+  methodFeedback?: string;
+  methodFeedbackScore?: FeedbackScore;
   isCorrect?: boolean;
   explanation?: string;
   technique?: Technique;
@@ -75,6 +80,8 @@ export interface ModuleLevel {
   blanks?: string[];
   template?: string;
   referencePrompt?: string;
+  referenceMethod?: PromptingMethod;
+  referenceRationale?: string;
   rubric?: Rubric;
 }
 
@@ -133,6 +140,13 @@ export interface AssessmentSubmission {
 
 export interface AssessmentRecordPayload {
   background: UserBackground;
+  preSurvey: {
+    skillLevel: string;
+    confidence: string;
+  };
+  postSurvey: {
+    confidence: string;
+  };
   pretest: AssessmentSubmission;
   posttest: AssessmentSubmission;
   scores: {

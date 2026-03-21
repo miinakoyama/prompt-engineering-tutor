@@ -508,7 +508,7 @@ export const MODULES: Module[] = [
         levels: {
           1: {
             title: "Technique Match",
-            task: 'Question 1 (Multiple Choice): You are a Graduate Research Assistant comparing 10 abstracts about "AI in the Classroom." Some argue AI improves engagement, others argue it increases cognitive load. Your advisor wants a synthesis that maps disagreements and proposes a unified research question. Which prompting method is MOST suitable?',
+            task: 'You are a Graduate Research Assistant comparing 10 abstracts about "AI in the Classroom." Some argue AI improves engagement, others argue it increases cognitive load. Your advisor wants a synthesis that maps disagreements and proposes a unified research question. Which prompting method is MOST suitable?',
             choices: [
               {
                 text: "A. Zero-shot Prompting: The model can summarize papers instantly.",
@@ -532,7 +532,10 @@ export const MODULES: Module[] = [
           },
           2: {
             title: "Application",
-            task: "Question 2 (Prompt Writing): You are a Head TA for a course with 300 students and raw peer-feedback comments. You need to detect non-constructive language, assign Contribution Level (High/Medium/Low), and output: Student Name | Constructive (Y/N) | Contribution | TA Note.\n2.1 Identify the most suitable method.\n2.2 Briefly explain why this is most efficient and accurate.\n2.3 Draft a comprehensive prompt.",
+            task: "You are a Head TA for a course with 300 students and raw peer-feedback comments. You need to detect non-constructive language, assign Contribution Level (High/Medium/Low), and output: Student Name | Constructive (Y/N) | Contribution | TA Note.",
+            referenceMethod: "Few-shot",
+            referenceRationale:
+              "Few-shot is most efficient and accurate because this is a high-volume, pattern-driven formatting task where consistency is critical across many records.",
             referencePrompt:
               "Method: Few-shot\nRationale: High-volume formatting tasks need strict pattern consistency for reliable outputs.\nPrompt:\nYou are an Academic Administrative Assistant. Your task is to process peer feedback for a university course.\nCriteria for Contribution: High = led complex tasks or helped others; Medium = completed assigned tasks; Low = unresponsive or missed deadlines.\nConvert feedback into: Name | Constructive (Y/N) | Contribution | TA Note\nInput: 'Feedback for Sarah: She wrote the entire Python script and helped me debug my part. Very polite.'\nOutput: Sarah | Y | High | Led technical development and supported teammates.\nInput: 'Feedback for Mark: We did not hear from him for two weeks and had to finish his slides.'\nOutput: Mark | Y | Low | Unresponsive for a significant period; group covered his workload.\nInput: [Insert Student Feedback Text Here]\nOutput:",
             rubric: TECHNIQUE_SELECTION_RUBRIC,
@@ -549,7 +552,7 @@ export const MODULES: Module[] = [
         levels: {
           1: {
             title: "Technique Match",
-            task: "Question 1 (Multiple Choice): You have a 15-email thread between a client, developer, and designer about delays and blame-shifting. Your boss wants a concise executive summary with root cause and a middle-ground solution. Which method is MOST suitable?",
+            task: "You have a 15-email thread between a client, developer, and designer about delays and blame-shifting. Your boss wants a concise executive summary with root cause and a middle-ground solution. Which method is MOST suitable?",
             choices: [
               {
                 text: "A. Zero-shot Prompting: The LLM already knows summarization and this is fastest.",
@@ -573,7 +576,10 @@ export const MODULES: Module[] = [
           },
           2: {
             title: "Application",
-            task: 'Question 2 (Prompt Writing): Your company is hiring for a niche "Senior EdTech Researcher" role. You must process 200 resumes and output CSV-ready rows: Name | University Match (Y/N) | Fit Score | Reason.\n2.1 Identify whether to use Zero-shot, Few-shot, CoT, or hybrid.\n2.2 Explain why this is efficient and accurate for high-volume processing.\n2.3 Draft a comprehensive prompt.',
+            task: 'Your company is hiring for a niche "Senior EdTech Researcher" role. You must process 200 resumes and output CSV-ready rows: Name | University Match (Y/N) | Fit Score | Reason.',
+            referenceMethod: "Few-shot",
+            referenceRationale:
+              "Few-shot is best because converting 200 resumes into a strict output format depends on repeatable examples and stable structure.",
             referencePrompt:
               'Method: Few-shot\nRationale: Processing 200 items into strict CSV-ready structure requires pattern consistency and repeatable labeling.\nPrompt:\nYou are an HR Data Analyst. Screen resumes for the "Senior EdTech Researcher" role.\nTarget Universities: CMU, Stanford, Harvard, MIT, UPenn, Columbia, Cornell, NYU, UC Berkeley, and UW.\nCulture Fit Scoring: 1 (no volunteering), 3 (general volunteering), 5 (leadership in education-related volunteering).\nConvert each resume into: Name | University Match (Y/N) | Fit Score | Reason\nInput: Resume: "Alex Smith. PhD from Stanford. Volunteered as a math tutor for 3 years."\nOutput: Alex Smith | Y | 3 | Stanford is on the target list; volunteering is relevant but not leadership-level.\nInput: Resume: "Jamie Doe. Masters from University of Michigan. No volunteer history."\nOutput: Jamie Doe | N | 1 | University not on target list; no volunteer history provided.\nInput: [Insert Resume Text Here]\nOutput:',
             rubric: TECHNIQUE_SELECTION_RUBRIC,

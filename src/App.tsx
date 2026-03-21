@@ -178,6 +178,19 @@ const EMPTY_PROGRESS: Record<Technique, Level[]> = {
 };
 
 const ASSESSMENT_TASK_IDS: AssessmentTaskId[] = [1, 2, 3, 4];
+const SKILL_LEVEL_OPTIONS = [
+  "Beginner",
+  "Intermediate",
+  "Advanced",
+  "Expert",
+];
+const CONFIDENCE_OPTIONS = [
+  "Not confident",
+  "Slightly confident",
+  "Moderately confident",
+  "Very confident",
+  "Extremely confident",
+];
 
 function createEmptyAssessmentAnswers(): AssessmentAnswers {
   return {
@@ -252,6 +265,9 @@ export default function App() {
     Record<string, boolean>
   >({});
   const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
+  const [methodReviewingLogId, setMethodReviewingLogId] = useState<
+    string | null
+  >(null);
   const [focusLogId, setFocusLogId] = useState<string | null>(null);
   const [pretestAnswers, setPretestAnswers] = useState<AssessmentAnswers>(
     createEmptyAssessmentAnswers(),
@@ -259,6 +275,9 @@ export default function App() {
   const [posttestAnswers, setPosttestAnswers] = useState<AssessmentAnswers>(
     createEmptyAssessmentAnswers(),
   );
+  const [preSkillLevel, setPreSkillLevel] = useState("");
+  const [preConfidence, setPreConfidence] = useState("");
+  const [postConfidence, setPostConfidence] = useState("");
   const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
   const [, setAssessmentRecords] = useState<AssessmentRecordPayload[]>([]);
   const [deepLinkedTechnique] = useState<Technique | null>(() => {
@@ -321,6 +340,13 @@ export default function App() {
     });
   };
 
+  const isSurveyComplete = (phase: AssessmentPhase) => {
+    if (phase === "pre") {
+      return Boolean(preSkillLevel && preConfidence);
+    }
+    return Boolean(postConfidence);
+  };
+
   const updateAssessmentAnswer = (
     phase: AssessmentPhase,
     taskId: AssessmentTaskId,
@@ -364,7 +390,8 @@ export default function App() {
   });
 
   const parseOrFallbackFeedbackScore = (response: string, rubric: Rubric) =>
-    parseGradingResponse(response, rubric) || createFallbackFeedbackScore(rubric);
+    parseGradingResponse(response, rubric) ||
+    createFallbackFeedbackScore(rubric);
 
   const buildPromptScoringRequest = (
     task: AssessmentTask,
@@ -452,7 +479,10 @@ ${scoreJsonTemplate}
     const promptScoreText = await callGeminiWithRetry(
       buildPromptScoringRequest(task, answer.prompt, promptRubric),
     );
-    const promptScore = parseOrFallbackFeedbackScore(promptScoreText, promptRubric);
+    const promptScore = parseOrFallbackFeedbackScore(
+      promptScoreText,
+      promptRubric,
+    );
 
     let methodRationaleScore: FeedbackScore | undefined;
     if (task.requiresMethodSelection && answer.method) {
@@ -556,6 +586,7 @@ ${scoreJsonTemplate}
     setIsModuleIntro(true);
     setLogs([]);
     setPromptDrafts({});
+    setMethodReviewingLogId(null);
 
     const introLogId = addLog({
       type: "intro",
@@ -593,8 +624,12 @@ ${scoreJsonTemplate}
     setExpandedResults({});
     setFocusLogId(null);
     setPromptDrafts({});
+    setMethodReviewingLogId(null);
     setPretestAnswers(createEmptyAssessmentAnswers());
     setPosttestAnswers(createEmptyAssessmentAnswers());
+    setPreSkillLevel("");
+    setPreConfidence("");
+    setPostConfidence("");
     setIsSubmittingAssessment(false);
   };
 
@@ -607,6 +642,7 @@ ${scoreJsonTemplate}
     setExpandedResults({});
     setPendingAction(null);
     setPromptDrafts({});
+    setMethodReviewingLogId(null);
     startModule("Zero-shot", background);
   };
 
@@ -702,6 +738,14 @@ ${scoreJsonTemplate}
       return;
     }
 
+    const targetLog = logs.find((entry) => entry.id === logId);
+    if (
+      targetLog?.technique === "Technique Selection" &&
+      !targetLog.methodStepCompleted
+    ) {
+      return;
+    }
+
     const activeTechnique = currentTechnique;
     const activeLevel = currentLevel;
     const module = MODULES.find((item) => item.id === activeTechnique)!;
@@ -729,8 +773,16 @@ ${scoreJsonTemplate}
       const resultText = await callGeminiWithRetry(prompt);
 
       const levelData = moduleContent.levels[activeLevel];
-      const rubric = levelData.rubric || getRubricForTechnique(activeTechnique);
+      const selectedMethod = targetLog?.selectedMethod;
+      const rubric =
+        activeTechnique === "Technique Selection" && selectedMethod
+          ? getRubricForMethod(selectedMethod)
+          : levelData.rubric || getRubricForTechnique(activeTechnique);
       const referencePrompt = levelData.referencePrompt || "";
+      const methodContext =
+        activeTechnique === "Technique Selection"
+          ? `\nSELECTED METHOD:\n${selectedMethod || "Not provided"}\n\nLEARNER RATIONALE:\n"""${targetLog?.selectedRationale || ""}"""\n`
+          : "";
 
       const criteriaList = rubric.criteria
         .map((c) => `- ${c.id}: ${c.description}`)
@@ -749,6 +801,7 @@ LEARNER'S PROMPT:
 
 AI RESPONSE TO LEARNER'S PROMPT:
 """${resultText}"""
+${methodContext}
 
 EVALUATION CRITERIA:
 ${criteriaList}
@@ -846,15 +899,105 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     }
   };
 
+  const handleTechniqueSelectionMethodSubmit = async (logId: string) => {
+    if (!background) {
+      return;
+    }
+
+    const targetLog = logs.find((entry) => entry.id === logId);
+    if (
+      !targetLog ||
+      targetLog.technique !== "Technique Selection" ||
+      !targetLog.selectedMethod ||
+      !targetLog.selectedRationale?.trim()
+    ) {
+      return;
+    }
+
+    const module = MODULES.find((item) => item.id === targetLog.technique)!;
+    const levelData = module.byPersona[background].levels[targetLog.level || 2];
+    const gradingPrompt = `You are evaluating method selection for prompt engineering.
+
+TASK:
+${levelData.task}
+
+REFERENCE METHOD:
+${levelData.referenceMethod || "N/A"}
+
+REFERENCE RATIONALE:
+${levelData.referenceRationale || "N/A"}
+
+LEARNER METHOD:
+${targetLog.selectedMethod}
+
+LEARNER RATIONALE:
+${targetLog.selectedRationale}
+
+EVALUATION CRITERIA:
+${formatCriteriaList(METHOD_RATIONALE_RUBRIC)}
+
+Respond with ONLY valid JSON:
+{
+  "scores": {
+${formatScoreJsonTemplate(METHOD_RATIONALE_RUBRIC)}
+  },
+  "feedback": "2-3 sentences of concise feedback on method choice quality."
+}`;
+
+    setMethodReviewingLogId(logId);
+    try {
+      const gradingResponse = await callGeminiWithRetry(gradingPrompt);
+      const methodFeedbackScore = parseOrFallbackFeedbackScore(
+        gradingResponse,
+        METHOD_RATIONALE_RUBRIC,
+      );
+
+      let feedbackText = "";
+      try {
+        const jsonMatch = gradingResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          feedbackText = parsed.feedback || "";
+        }
+      } catch {
+        feedbackText = "";
+      }
+
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.id === logId
+            ? {
+                ...log,
+                methodStepCompleted: true,
+                methodFeedback:
+                  feedbackText ||
+                  "Nice start. Refine your method rationale to align with task structure.",
+                methodFeedbackScore,
+              }
+            : log,
+        ),
+      );
+    } finally {
+      setMethodReviewingLogId(null);
+    }
+  };
+
   const handlePretestSubmit = () => {
-    if (!isAssessmentComplete(PRE_TEST_TASKS, pretestAnswers)) {
+    if (
+      !isAssessmentComplete(PRE_TEST_TASKS, pretestAnswers) ||
+      !isSurveyComplete("pre")
+    ) {
       return;
     }
     setFlowStage("learning");
   };
 
   const handlePosttestSubmit = async () => {
-    if (!background || !isAssessmentComplete(POST_TEST_TASKS, posttestAnswers)) {
+    if (
+      !background ||
+      !isAssessmentComplete(POST_TEST_TASKS, posttestAnswers) ||
+      !isSurveyComplete("post")
+    ) {
       return;
     }
 
@@ -867,6 +1010,13 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
 
       persistAssessment({
         background,
+        preSurvey: {
+          skillLevel: preSkillLevel,
+          confidence: preConfidence,
+        },
+        postSurvey: {
+          confidence: postConfidence,
+        },
         pretest: { phase: "pre", answers: pretestAnswers },
         posttest: { phase: "post", answers: posttestAnswers },
         scores: {
@@ -910,7 +1060,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
       return `Start ${pendingAction.technique}`;
     }
 
-    return "View completion summary";
+    return "Go to Post-Test";
   };
 
   const progressPanel = (
@@ -995,7 +1145,8 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     tasks: AssessmentTask[],
     answers: AssessmentAnswers,
   ) => {
-    const isComplete = isAssessmentComplete(tasks, answers);
+    const isComplete =
+      isAssessmentComplete(tasks, answers) && isSurveyComplete(phase);
     const submitLabel = phase === "pre" ? "Start Learning Modules" : "Submit";
     const submitAction =
       phase === "pre" ? handlePretestSubmit : handlePosttestSubmit;
@@ -1017,6 +1168,91 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                   : "Answer the following tasks to capture your post-learning performance."}
               </p>
             </div>
+
+            <section className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-5">
+              <p className="text-sm font-bold uppercase tracking-[0.14em] text-brand-orange">
+                Baseline Questions
+              </p>
+
+              {phase === "pre" && (
+                <>
+                  <div className="space-y-3">
+                    <p className="text-slate-700 leading-relaxed font-semibold">
+                      How would you rate your current prompt engineering skill
+                      level?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {SKILL_LEVEL_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setPreSkillLevel(option)}
+                          className={cn(
+                            "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                            preSkillLevel === option
+                              ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
+                              : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                          )}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-slate-700 leading-relaxed font-semibold">
+                      How confident are you in selecting the most appropriate
+                      prompting technique for a new task?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {CONFIDENCE_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setPreConfidence(option)}
+                          className={cn(
+                            "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                            preConfidence === option
+                              ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
+                              : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                          )}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {phase === "post" && (
+                <div className="space-y-3">
+                  <p className="text-slate-700 leading-relaxed font-semibold">
+                    After completing this training, how confident are you in
+                    selecting the most appropriate prompting technique for a new
+                    task?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {CONFIDENCE_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setPostConfidence(option)}
+                        className={cn(
+                          "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                          postConfidence === option
+                            ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
 
             {tasks.map((task) => (
               <section
@@ -1468,52 +1704,209 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                           )}
 
                           {log.level && log.level >= 2 && (
-                            <div className="mt-12 relative">
-                              {log.submittedPrompt ? (
-                                <textarea
-                                  readOnly
-                                  value={log.submittedPrompt}
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-5 pl-8 pr-8 shadow-sm transition-all text-base resize-none min-h-[120px] text-slate-700"
-                                />
-                              ) : (
-                                <>
-                                  <textarea
-                                    autoFocus
-                                    placeholder="Compose your prompt..."
-                                    value={promptDrafts[log.id] || ""}
-                                    onChange={(event) =>
-                                      setPromptDrafts((prev) => ({
-                                        ...prev,
-                                        [log.id]: event.target.value,
-                                      }))
-                                    }
-                                    className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
-                                    onKeyDown={(event) => {
-                                      if (
-                                        event.key === "Enter" &&
-                                        !event.shiftKey
-                                      ) {
-                                        event.preventDefault();
-                                        handlePromptSubmit(
-                                          promptDrafts[log.id] || "",
-                                          log.id,
-                                        );
+                            <div className="mt-12 space-y-5">
+                              {log.technique === "Technique Selection" &&
+                                log.level === 2 && (
+                                  <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
+                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                      Step 1: Select Method and Explain Why
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {METHOD_OPTIONS.map((method) => (
+                                        <button
+                                          key={method}
+                                          type="button"
+                                          disabled={!!log.methodStepCompleted}
+                                          onClick={() =>
+                                            setLogs((prev) =>
+                                              prev.map((entry) =>
+                                                entry.id === log.id
+                                                  ? {
+                                                      ...entry,
+                                                      selectedMethod: method,
+                                                    }
+                                                  : entry,
+                                              ),
+                                            )
+                                          }
+                                          className={cn(
+                                            "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                                            log.selectedMethod === method
+                                              ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
+                                              : "bg-white border-slate-200 text-slate-600",
+                                            log.methodStepCompleted &&
+                                              "opacity-70 cursor-not-allowed",
+                                          )}
+                                        >
+                                          {method}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <textarea
+                                      placeholder="Why is this method the best fit?"
+                                      value={log.selectedRationale || ""}
+                                      readOnly={!!log.methodStepCompleted}
+                                      onChange={(event) =>
+                                        setLogs((prev) =>
+                                          prev.map((entry) =>
+                                            entry.id === log.id
+                                              ? {
+                                                  ...entry,
+                                                  selectedRationale:
+                                                    event.target.value,
+                                                }
+                                              : entry,
+                                          ),
+                                        )
                                       }
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      handlePromptSubmit(
-                                        promptDrafts[log.id] || "",
-                                        log.id,
-                                      );
-                                    }}
-                                    className="absolute right-3 bottom-3 p-4 gradient-text"
-                                    aria-label="Submit prompt"
-                                  >
-                                    <Send className="w-6 h-6" />
-                                  </button>
-                                </>
+                                      className={cn(
+                                        "w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[100px]",
+                                        log.methodStepCompleted &&
+                                          "bg-slate-100 text-slate-600",
+                                      )}
+                                    />
+                                    {!log.methodStepCompleted && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleTechniqueSelectionMethodSubmit(
+                                            log.id,
+                                          )
+                                        }
+                                        disabled={
+                                          !log.selectedMethod ||
+                                          !log.selectedRationale?.trim() ||
+                                          methodReviewingLogId === log.id
+                                        }
+                                        className={cn(
+                                          "w-full py-3 rounded-xl font-bold text-sm uppercase tracking-[0.14em] transition-all",
+                                          !log.selectedMethod ||
+                                            !log.selectedRationale?.trim() ||
+                                            methodReviewingLogId === log.id
+                                            ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                            : "gradient-bg text-white shadow-lg shadow-brand-pink/20 hover:scale-[1.01]",
+                                        )}
+                                      >
+                                        {methodReviewingLogId === log.id
+                                          ? "Reviewing..."
+                                          : "Submit Method"}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                              {log.technique === "Technique Selection" &&
+                                log.level === 2 &&
+                                log.methodStepCompleted && (
+                                  <div className="p-5 rounded-xl border border-slate-200 bg-white space-y-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                        Method Feedback
+                                      </p>
+                                      {log.methodFeedbackScore && (
+                                        <span
+                                          className={cn(
+                                            "px-3 py-1 rounded-full text-xs font-semibold",
+                                            log.methodFeedbackScore.grade ===
+                                              "green"
+                                              ? "bg-emerald-100 text-emerald-700"
+                                              : log.methodFeedbackScore
+                                                    .grade === "yellow"
+                                                ? "bg-amber-100 text-amber-700"
+                                                : "bg-red-100 text-red-700",
+                                          )}
+                                        >
+                                          {log.methodFeedbackScore.totalScore}/
+                                          {log.methodFeedbackScore.maxScore}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {log.methodFeedback && (
+                                      <p className="text-base text-slate-700 leading-relaxed">
+                                        {log.methodFeedback}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+                              {(log.technique !== "Technique Selection" ||
+                                log.level !== 2 ||
+                                log.methodStepCompleted) && (
+                                <div
+                                  className={cn(
+                                    "space-y-3",
+                                    log.technique === "Technique Selection" &&
+                                      log.level === 2 &&
+                                      log.methodStepCompleted &&
+                                      "p-5 rounded-xl border border-slate-200 bg-slate-50/70",
+                                  )}
+                                >
+                                  {log.technique === "Technique Selection" &&
+                                    log.level === 2 &&
+                                    log.methodStepCompleted && (
+                                      <>
+                                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                          Step 2: Write Your Prompt
+                                        </p>
+                                        <p className="text-sm text-slate-700 leading-relaxed">
+                                          Using the method you selected and the
+                                          feedback above, write your full prompt
+                                          and submit it.
+                                        </p>
+                                      </>
+                                    )}
+                                  <div className="relative">
+                                    {log.submittedPrompt ? (
+                                      <textarea
+                                        readOnly
+                                        value={log.submittedPrompt}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-5 pl-8 pr-8 shadow-sm transition-all text-base resize-none min-h-[120px] text-slate-700"
+                                      />
+                                    ) : (
+                                      <>
+                                        <textarea
+                                          autoFocus
+                                          placeholder="Compose your prompt..."
+                                          value={promptDrafts[log.id] || ""}
+                                          onChange={(event) =>
+                                            setPromptDrafts((prev) => ({
+                                              ...prev,
+                                              [log.id]: event.target.value,
+                                            }))
+                                          }
+                                          className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
+                                          onKeyDown={(event) => {
+                                            if (
+                                              event.key === "Enter" &&
+                                              (event.metaKey || event.ctrlKey)
+                                            ) {
+                                              event.preventDefault();
+                                              handlePromptSubmit(
+                                                promptDrafts[log.id] || "",
+                                                log.id,
+                                              );
+                                            }
+                                          }}
+                                        />
+                                        <p className="mt-2 text-xs text-slate-500">
+                                          Press Cmd/Ctrl + Enter to submit
+                                        </p>
+                                        <button
+                                          onClick={() => {
+                                            handlePromptSubmit(
+                                              promptDrafts[log.id] || "",
+                                              log.id,
+                                            );
+                                          }}
+                                          className="absolute right-3 bottom-3 p-4 gradient-text"
+                                          aria-label="Submit prompt"
+                                        >
+                                          <Send className="w-6 h-6" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           )}

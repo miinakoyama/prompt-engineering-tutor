@@ -50,7 +50,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 
-function getRubricForTechnique(technique: Technique) {
+function getRubricForTechnique(technique: Technique): Rubric {
   switch (technique) {
     case "Zero-shot":
       return ZERO_SHOT_RUBRIC;
@@ -60,6 +60,10 @@ function getRubricForTechnique(technique: Technique) {
       return COT_RUBRIC;
     case "Technique Selection":
       return TECHNIQUE_SELECTION_RUBRIC;
+    default: {
+      const _exhaustiveCheck: never = technique;
+      throw new Error(`Unsupported technique: ${_exhaustiveCheck}`);
+    }
   }
 }
 
@@ -71,6 +75,10 @@ function getRubricForMethod(method: PromptingMethod): Rubric {
       return FEW_SHOT_RUBRIC;
     case "Chain-of-Thought":
       return COT_RUBRIC;
+    default: {
+      const _exhaustiveCheck: never = method;
+      throw new Error(`Unsupported method: ${_exhaustiveCheck}`);
+    }
   }
 }
 
@@ -243,6 +251,7 @@ export default function App() {
   const [expandedResults, setExpandedResults] = useState<
     Record<string, boolean>
   >({});
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
   const [focusLogId, setFocusLogId] = useState<string | null>(null);
   const [pretestAnswers, setPretestAnswers] = useState<AssessmentAnswers>(
     createEmptyAssessmentAnswers(),
@@ -546,6 +555,7 @@ ${scoreJsonTemplate}
     setPendingAction(null);
     setIsModuleIntro(true);
     setLogs([]);
+    setPromptDrafts({});
 
     const introLogId = addLog({
       type: "intro",
@@ -582,6 +592,7 @@ ${scoreJsonTemplate}
     setCompletedLevels(EMPTY_PROGRESS);
     setExpandedResults({});
     setFocusLogId(null);
+    setPromptDrafts({});
     setPretestAnswers(createEmptyAssessmentAnswers());
     setPosttestAnswers(createEmptyAssessmentAnswers());
     setIsSubmittingAssessment(false);
@@ -595,6 +606,7 @@ ${scoreJsonTemplate}
     setCompletedLevels(EMPTY_PROGRESS);
     setExpandedResults({});
     setPendingAction(null);
+    setPromptDrafts({});
     startModule("Zero-shot", background);
   };
 
@@ -707,6 +719,11 @@ ${scoreJsonTemplate}
 
     setPendingAction(null);
     setIsWaitingForResult(true);
+    setPromptDrafts((prev) => {
+      const next = { ...prev };
+      delete next[logId];
+      return next;
+    });
 
     try {
       const resultText = await callGeminiWithRetry(prompt);
@@ -1463,6 +1480,13 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                   <textarea
                                     autoFocus
                                     placeholder="Compose your prompt..."
+                                    value={promptDrafts[log.id] || ""}
+                                    onChange={(event) =>
+                                      setPromptDrafts((prev) => ({
+                                        ...prev,
+                                        [log.id]: event.target.value,
+                                      }))
+                                    }
                                     className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
                                     onKeyDown={(event) => {
                                       if (
@@ -1471,19 +1495,16 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                       ) {
                                         event.preventDefault();
                                         handlePromptSubmit(
-                                          (event.target as HTMLTextAreaElement)
-                                            .value,
+                                          promptDrafts[log.id] || "",
                                           log.id,
                                         );
                                       }
                                     }}
                                   />
                                   <button
-                                    onClick={(event) => {
-                                      const textarea = event.currentTarget
-                                        .previousSibling as HTMLTextAreaElement;
+                                    onClick={() => {
                                       handlePromptSubmit(
-                                        textarea.value,
+                                        promptDrafts[log.id] || "",
                                         log.id,
                                       );
                                     }}

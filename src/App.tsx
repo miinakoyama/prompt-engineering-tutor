@@ -399,14 +399,6 @@ export default function App() {
     try {
       const resultText = await callGeminiWithRetry(prompt);
 
-      const resultLogId = addLog({
-        type: "result",
-        content: resultText,
-        prompt,
-        technique: activeTechnique,
-        level: activeLevel,
-      });
-
       const levelData = moduleContent.levels[activeLevel];
       const rubric = levelData.rubric || getRubricForTechnique(activeTechnique);
       const referencePrompt = levelData.referencePrompt || "";
@@ -465,20 +457,22 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
         feedbackText = "";
       }
 
-      addLog({
+      const reviewLogId = addLog({
         type: "review",
         content:
           feedbackText ||
           "Good effort! Try adding more specific details to make your prompt clearer.",
         reviewType: "feedback",
         feedbackScore: feedbackScore || undefined,
+        prompt,
+        generatedResponse: resultText,
       });
 
       setExpandedResults((prev) => ({
         ...prev,
-        [resultLogId]: false,
+        [reviewLogId]: false,
       }));
-      setFocusLogId(resultLogId);
+      setFocusLogId(reviewLogId);
       setIsWaitingForResult(false);
 
       markLevelComplete(activeTechnique, activeLevel);
@@ -901,132 +895,52 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                             </div>
                           )}
 
-                          {log.level &&
-                            log.level >= 2 &&
-                            !log.submittedPrompt && (
-                              <div className="mt-12 relative">
+                          {log.level && log.level >= 2 && (
+                            <div className="mt-12 relative">
+                              {log.submittedPrompt ? (
                                 <textarea
-                                  autoFocus
-                                  placeholder="Compose your prompt..."
-                                  className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
-                                  onKeyDown={(event) => {
-                                    if (
-                                      event.key === "Enter" &&
-                                      !event.shiftKey
-                                    ) {
-                                      event.preventDefault();
+                                  readOnly
+                                  value={log.submittedPrompt}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-5 pl-8 pr-8 shadow-sm transition-all text-base resize-none min-h-[120px] text-slate-700"
+                                />
+                              ) : (
+                                <>
+                                  <textarea
+                                    autoFocus
+                                    placeholder="Compose your prompt..."
+                                    className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
+                                    onKeyDown={(event) => {
+                                      if (
+                                        event.key === "Enter" &&
+                                        !event.shiftKey
+                                      ) {
+                                        event.preventDefault();
+                                        handlePromptSubmit(
+                                          (event.target as HTMLTextAreaElement)
+                                            .value,
+                                          log.id,
+                                        );
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={(event) => {
+                                      const textarea = event.currentTarget
+                                        .previousSibling as HTMLTextAreaElement;
                                       handlePromptSubmit(
-                                        (event.target as HTMLTextAreaElement)
-                                          .value,
+                                        textarea.value,
                                         log.id,
                                       );
-                                    }
-                                  }}
-                                />
-                                <button
-                                  onClick={(event) => {
-                                    const textarea = event.currentTarget
-                                      .previousSibling as HTMLTextAreaElement;
-                                    handlePromptSubmit(textarea.value, log.id);
-                                  }}
-                                  className="absolute right-3 bottom-3 p-4 gradient-text"
-                                  aria-label="Submit prompt"
-                                >
-                                  <Send className="w-6 h-6" />
-                                </button>
-                              </div>
-                            )}
-                        </div>
-                      )}
-
-                      {log.type === "result" && (
-                        <div className="space-y-6 py-8">
-                          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-stretch">
-                            <div className="p-5 bg-slate-50 rounded-xl border border-slate-100">
-                              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400 mb-3">
-                                Your Prompt
-                              </p>
-                              <div className="font-mono text-base text-slate-700 leading-relaxed whitespace-pre-line">
-                                {log.prompt}
-                              </div>
-                            </div>
-
-                            <div className="hidden lg:flex items-center justify-center px-2">
-                              <ArrowRight className="w-5 h-5 text-brand-pink" />
-                            </div>
-
-                            <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
-                              <div className="flex items-center justify-between gap-4 mb-3">
-                                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
-                                  AI Response
-                                </p>
-                                {log.content.length > 700 && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setExpandedResults((prev) => ({
-                                        ...prev,
-                                        [log.id]: !prev[log.id],
-                                      }))
-                                    }
-                                    className="text-sm font-semibold text-slate-500 hover:text-slate-700"
-                                  >
-                                    {expandedResults[log.id]
-                                      ? "Collapse"
-                                      : "Expand"}
-                                  </button>
-                                )}
-                              </div>
-
-                              <div className="relative">
-                                <div
-                                  className={cn(
-                                    "leading-relaxed text-slate-700 text-base markdown-content",
-                                    !expandedResults[log.id] &&
-                                      log.content.length > 700 &&
-                                      "max-h-64 overflow-hidden",
-                                  )}
-                                >
-                                  <ReactMarkdown
-                                    components={{
-                                      p: ({ children }) => (
-                                        <p className="mb-3 last:mb-0">
-                                          {children}
-                                        </p>
-                                      ),
-                                      ul: ({ children }) => (
-                                        <ul className="space-y-2 my-4 list-disc pl-5">
-                                          {children}
-                                        </ul>
-                                      ),
-                                      ol: ({ children }) => (
-                                        <ol className="space-y-2 my-4 list-decimal pl-5">
-                                          {children}
-                                        </ol>
-                                      ),
-                                      li: ({ children }) => (
-                                        <li className="text-slate-700">
-                                          {children}
-                                        </li>
-                                      ),
-                                      strong: ({ children }) => (
-                                        <strong className="font-semibold text-slate-900">
-                                          {children}
-                                        </strong>
-                                      ),
                                     }}
+                                    className="absolute right-3 bottom-3 p-4 gradient-text"
+                                    aria-label="Submit prompt"
                                   >
-                                    {log.content}
-                                  </ReactMarkdown>
-                                </div>
-
-                                {!expandedResults[log.id] &&
-                                  log.content.length > 700 && (
-                                    <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-                                  )}
-                              </div>
+                                    <Send className="w-6 h-6" />
+                                  </button>
+                                </>
+                              )}
                             </div>
-                          </div>
+                          )}
                         </div>
                       )}
 
@@ -1076,6 +990,81 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                         log.reviewType === "feedback" && (
                           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="p-6 space-y-5">
+                              {log.generatedResponse && (
+                                <div className="p-5 bg-slate-50 rounded-xl border border-slate-100">
+                                  <div className="flex items-center justify-between gap-4 mb-3">
+                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
+                                      Here is the response generated from your
+                                      prompt:
+                                    </p>
+                                    {log.generatedResponse.length > 700 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setExpandedResults((prev) => ({
+                                            ...prev,
+                                            [log.id]: !prev[log.id],
+                                          }))
+                                        }
+                                        className="text-sm font-semibold text-slate-500 hover:text-slate-700"
+                                      >
+                                        {expandedResults[log.id]
+                                          ? "Collapse"
+                                          : "Expand"}
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="relative">
+                                    <div
+                                      className={cn(
+                                        "leading-relaxed text-slate-700 text-base markdown-content",
+                                        !expandedResults[log.id] &&
+                                          log.generatedResponse.length > 700 &&
+                                          "max-h-64 overflow-hidden",
+                                      )}
+                                    >
+                                      <ReactMarkdown
+                                        components={{
+                                          p: ({ children }) => (
+                                            <p className="mb-3 last:mb-0">
+                                              {children}
+                                            </p>
+                                          ),
+                                          ul: ({ children }) => (
+                                            <ul className="space-y-2 my-4 list-disc pl-5">
+                                              {children}
+                                            </ul>
+                                          ),
+                                          ol: ({ children }) => (
+                                            <ol className="space-y-2 my-4 list-decimal pl-5">
+                                              {children}
+                                            </ol>
+                                          ),
+                                          li: ({ children }) => (
+                                            <li className="text-slate-700">
+                                              {children}
+                                            </li>
+                                          ),
+                                          strong: ({ children }) => (
+                                            <strong className="font-semibold text-slate-900">
+                                              {children}
+                                            </strong>
+                                          ),
+                                        }}
+                                      >
+                                        {log.generatedResponse}
+                                      </ReactMarkdown>
+                                    </div>
+
+                                    {!expandedResults[log.id] &&
+                                      log.generatedResponse.length > 700 && (
+                                        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none" />
+                                      )}
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="flex items-center justify-between gap-4">
                                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                                   Feedback

@@ -29,6 +29,7 @@ export interface LogEntry {
   content: string;
   prediction?: string;
   prompt?: string;
+  generatedResponse?: string;
   selectedChoice?: string;
   isCorrect?: boolean;
   explanation?: string;

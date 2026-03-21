@@ -555,10 +555,10 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
   const progressPanel = (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
           Progress
         </p>
-        <p className="text-xs font-semibold text-slate-600">
+        <p className="text-sm font-semibold text-slate-600">
           {completedExerciseCount}/{totalExerciseCount}
         </p>
       </div>
@@ -610,14 +610,14 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                 </div>
                 <p
                   className={cn(
-                    "text-xs font-medium flex-1",
+                    "text-sm font-medium flex-1",
                     isCurrentModule ? "text-slate-900" : "text-slate-500",
                   )}
                 >
                   {module.id}
                 </p>
                 {completed.length === 3 && (
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600">
+                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-600">
                     ✓
                   </span>
                 )}
@@ -646,7 +646,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
           {background && (
             <>
               <div className="h-4 w-px bg-slate-200" />
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
                 {currentTechnique}{" "}
                 <span className="mx-2 text-slate-200">|</span> Level{" "}
                 {currentLevel}
@@ -657,7 +657,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
         <div className="flex items-center gap-4">
           {background ? (
             <div className="h-8 px-4 rounded-full border border-slate-100 bg-slate-50/50 flex items-center">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 {background}
               </span>
             </div>
@@ -676,13 +676,13 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
               <h1 className="text-5xl sm:text-6xl font-serif font-light mb-3 tracking-tight gradient-text whitespace-nowrap">
                 Prompt Mentor
               </h1>
-              <p className="text-slate-600 font-bold uppercase tracking-[0.24em] text-xs">
+              <p className="text-slate-600 font-bold uppercase tracking-[0.2em] text-sm">
                 Learn to Write Better Prompts
               </p>
             </div>
 
             <div className="max-w-sm mx-auto space-y-4">
-              <p className="text-sm font-bold text-slate-600 uppercase tracking-[0.18em] mb-6">
+              <p className="text-base font-bold text-slate-600 uppercase tracking-[0.16em] mb-6">
                 Choose Your Background
               </p>
               {(
@@ -697,7 +697,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                   onClick={() => handleBackgroundSelect(item)}
                   className="w-full py-5 px-8 rounded-xl bg-white border border-slate-100 hover:border-brand-pink shadow-sm hover:shadow-md transition-all flex items-center justify-between group"
                 >
-                  <span className="text-sm font-semibold text-slate-700">
+                  <span className="text-base font-semibold text-slate-700">
                     {item}
                   </span>
                   <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-brand-pink transition-all transform group-hover:translate-x-1" />
@@ -716,7 +716,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
             ref={scrollRef}
             className="flex-1 overflow-y-auto scrollbar-hide"
           >
-            <div className="max-w-5xl mx-auto px-4 lg:px-8 py-8">
+            <div className="w-full px-5 lg:px-10 xl:px-14 2xl:px-20 py-8">
               <div className="min-w-0 space-y-16 pb-48">
                 <section className="lg:hidden">
                   <div className="p-4 rounded-xl border border-slate-100 bg-white shadow-sm">
@@ -750,25 +750,25 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                             <div className="space-y-6">
                               <div className="flex items-center gap-3">
                                 <div className="h-px flex-1 bg-slate-100" />
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                                <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
                                   Contrast Analysis
                                 </span>
                                 <div className="h-px flex-1 bg-slate-100" />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
-                                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
                                     Ineffective
                                   </span>
-                                  <p className="text-slate-600 font-mono text-sm leading-relaxed whitespace-pre-line">
+                                  <p className="text-slate-600 font-mono text-base leading-relaxed whitespace-pre-line">
                                     {log.comparisonBad}
                                   </p>
                                 </div>
                                 <div className="p-6 rounded-2xl bg-white border border-brand-pink/10 shadow-sm space-y-3">
-                                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-pink">
+                                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
                                     Effective
                                   </span>
-                                  <p className="text-slate-800 font-mono text-sm leading-relaxed whitespace-pre-line">
+                                  <p className="text-slate-800 font-mono text-base leading-relaxed whitespace-pre-line">
                                     {log.comparisonGood}
                                   </p>
                                 </div>
@@ -810,12 +810,12 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
 
                       {log.type === "build" && (
                         <div className="pt-12 border-t border-slate-100">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-pink mb-8">
+                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-pink mb-8">
                             Current Exercise
                           </p>
 
                           <div className="space-y-6">
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">
+                            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
                               {log.title}
                             </p>
                             <p className="text-3xl font-serif font-light text-slate-900 leading-relaxed whitespace-pre-line">
@@ -824,10 +824,10 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
 
                             {log.previousPrompt && (
                               <div className="space-y-3 pt-4">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                                   Your Previous Prompt
                                 </p>
-                                <div className="p-5 rounded-xl bg-slate-50 border border-slate-100 font-mono text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                                <div className="p-5 rounded-xl bg-slate-50 border border-slate-100 font-mono text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                   {log.previousPrompt}
                                 </div>
                               </div>
@@ -883,7 +883,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                         </div>
                                         <p
                                           className={cn(
-                                            "text-sm leading-relaxed font-mono whitespace-pre-line",
+                                            "text-base leading-relaxed font-mono whitespace-pre-line",
                                             isSelected
                                               ? choice.isCorrect
                                                 ? "text-emerald-900"
@@ -908,7 +908,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                 <textarea
                                   autoFocus
                                   placeholder="Compose your prompt..."
-                                  className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-sm resize-none min-h-[120px]"
+                                  className="w-full bg-white border border-slate-200 rounded-xl py-5 pl-8 pr-20 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
                                   onKeyDown={(event) => {
                                     if (
                                       event.key === "Enter" &&
@@ -943,10 +943,10 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                         <div className="space-y-6 py-8">
                           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-stretch">
                             <div className="p-5 bg-slate-50 rounded-xl border border-slate-100">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+                              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400 mb-3">
                                 Your Prompt
                               </p>
-                              <div className="font-mono text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                              <div className="font-mono text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                 {log.prompt}
                               </div>
                             </div>
@@ -957,7 +957,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
 
                             <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
                               <div className="flex items-center justify-between gap-4 mb-3">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-pink">
+                                <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
                                   AI Response
                                 </p>
                                 {log.content.length > 700 && (
@@ -969,7 +969,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                         [log.id]: !prev[log.id],
                                       }))
                                     }
-                                    className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                                    className="text-sm font-semibold text-slate-500 hover:text-slate-700"
                                   >
                                     {expandedResults[log.id]
                                       ? "Collapse"
@@ -981,7 +981,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                               <div className="relative">
                                 <div
                                   className={cn(
-                                    "leading-relaxed text-slate-700 text-sm markdown-content",
+                                    "leading-relaxed text-slate-700 text-base markdown-content",
                                     !expandedResults[log.id] &&
                                       log.content.length > 700 &&
                                       "max-h-64 overflow-hidden",
@@ -1077,7 +1077,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="p-6 space-y-5">
                               <div className="flex items-center justify-between gap-4">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                                   Feedback
                                 </p>
                                 {log.feedbackScore && (
@@ -1125,7 +1125,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                         </span>
                                         <span
                                           className={cn(
-                                            "text-xs font-medium",
+                                            "text-sm font-medium",
                                             criterion.score === 1
                                               ? "text-emerald-700"
                                               : "text-red-700",
@@ -1140,7 +1140,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                               )}
 
                               {log.content && (
-                                <p className="text-sm text-slate-700 leading-relaxed">
+                                <p className="text-base text-slate-700 leading-relaxed">
                                   {log.content}
                                 </p>
                               )}
@@ -1151,7 +1151,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                       {log.type === "completion" && (
                         <div className="p-10 rounded-3xl border border-brand-pink/15 bg-white shadow-sm space-y-8">
                           <div className="space-y-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-pink">
+                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-pink">
                               Course Complete
                             </p>
                             <h3 className="text-4xl font-serif font-light text-slate-900">
@@ -1169,10 +1169,10 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                                 key={module.id}
                                 className="p-5 rounded-2xl border border-slate-100 bg-slate-50/60"
                               >
-                                <p className="text-sm font-semibold text-slate-900">
+                                <p className="text-base font-semibold text-slate-900">
                                   {module.id}
                                 </p>
-                                <p className="text-sm text-slate-600 mt-1">
+                                <p className="text-base text-slate-600 mt-1">
                                   {TECHNIQUE_SUMMARIES[module.id]}
                                 </p>
                               </div>
@@ -1214,7 +1214,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                       <div className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-bounce delay-100" />
                       <div className="w-1.5 h-1.5 rounded-full bg-brand-pink animate-bounce delay-200" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                    <span className="text-xs font-bold uppercase tracking-[0.14em]">
                       Reviewing your prompt
                     </span>
                   </motion.div>
@@ -1228,7 +1228,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
               {isModuleIntro && (
                 <button
                   onClick={() => proceedToLevel(1)}
-                  className="w-full py-4 gradient-bg text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-brand-pink/20 hover:scale-[1.01] transition-all"
+                  className="w-full py-4 gradient-bg text-white rounded-xl font-bold text-sm uppercase tracking-[0.14em] shadow-lg shadow-brand-pink/20 hover:scale-[1.01] transition-all"
                 >
                   Begin Practice
                 </button>
@@ -1237,7 +1237,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
               {!isModuleIntro && pendingAction && !isWaitingForResult && (
                 <button
                   onClick={handleContinue}
-                  className="w-full py-4 gradient-bg text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-brand-pink/20 hover:scale-[1.01] transition-all"
+                  className="w-full py-4 gradient-bg text-white rounded-xl font-bold text-sm uppercase tracking-[0.14em] shadow-lg shadow-brand-pink/20 hover:scale-[1.01] transition-all"
                 >
                   {getPendingActionLabel()}
                 </button>

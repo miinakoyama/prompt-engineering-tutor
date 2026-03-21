@@ -1,6 +1,6 @@
 export type UserBackground = 'Academic Setting' | 'Working Professional';
 
-export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
+export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought' | 'Technique Selection';
 
 export type Level = 1 | 2;
 

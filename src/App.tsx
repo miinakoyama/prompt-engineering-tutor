@@ -15,12 +15,14 @@ import {
   UserBackground,
   FeedbackScore,
   CriterionScore,
+  Rubric,
 } from "./types";
 import {
   MODULES,
   ZERO_SHOT_RUBRIC,
   FEW_SHOT_RUBRIC,
   COT_RUBRIC,
+  TECHNIQUE_SELECTION_RUBRIC,
 } from "./constants";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -42,20 +44,20 @@ function getRubricForTechnique(technique: Technique) {
       return FEW_SHOT_RUBRIC;
     case "Chain-of-Thought":
       return COT_RUBRIC;
+    case "Technique Selection":
+      return TECHNIQUE_SELECTION_RUBRIC;
   }
 }
 
 function parseGradingResponse(
   response: string,
-  technique: Technique,
+  rubric: Rubric,
 ): FeedbackScore | null {
   try {
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const rubric = getRubricForTechnique(technique);
-
     const criteriaScores: CriterionScore[] = rubric.criteria.map(
       (criterion) => {
         const score = parsed.scores?.[criterion.id];
@@ -131,13 +133,36 @@ const TECHNIQUE_SUMMARIES: Record<Technique, string> = {
     "Guide the model with consistent examples so it can continue the pattern.",
   "Chain-of-Thought":
     "Ask for step-by-step reasoning when the task needs structured thinking.",
+  "Technique Selection":
+    "Select the most appropriate prompting technique, then apply it effectively.",
 };
 
 const EMPTY_PROGRESS: Record<Technique, Level[]> = {
   "Zero-shot": [],
   "Few-shot": [],
   "Chain-of-Thought": [],
+  "Technique Selection": [],
 };
+
+function getTechniqueFromPath(pathname: string): Technique | null {
+  const normalized = pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+  switch (normalized) {
+    case "zero":
+    case "zero-shot":
+      return "Zero-shot";
+    case "few":
+    case "few-shot":
+      return "Few-shot";
+    case "cot":
+    case "chain-of-thought":
+      return "Chain-of-Thought";
+    case "selection":
+    case "technique-selection":
+      return "Technique Selection";
+    default:
+      return null;
+  }
+}
 
 export default function App() {
   const [background, setBackground] = useState<UserBackground | null>(null);
@@ -156,6 +181,12 @@ export default function App() {
     Record<string, boolean>
   >({});
   const [focusLogId, setFocusLogId] = useState<string | null>(null);
+  const [deepLinkedTechnique] = useState<Technique | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    return getTechniqueFromPath(window.location.pathname);
+  });
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -224,6 +255,7 @@ export default function App() {
     addLog({
       type: "intro",
       content: "",
+      technique,
       comparisonBad: content.badExample,
       comparisonGood: content.goodExample,
     });
@@ -235,7 +267,7 @@ export default function App() {
     setCompletedLevels(EMPTY_PROGRESS);
     setExpandedResults({});
     setPendingAction(null);
-    startModule("Zero-shot", selectedBackground);
+    startModule(deepLinkedTechnique ?? "Zero-shot", selectedBackground);
   };
 
   const handleReset = () => {
@@ -423,7 +455,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
       const gradingResponse = await callGeminiWithRetry(gradingPrompt);
       const feedbackScore = parseGradingResponse(
         gradingResponse,
-        activeTechnique,
+        rubric,
       );
 
       let feedbackText = "";
@@ -720,33 +752,90 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                               </p>
                             </div>
                           ) : log.comparisonBad && log.comparisonGood ? (
-                            <div className="space-y-6">
-                              <div className="flex items-center gap-3">
-                                <div className="h-px flex-1 bg-slate-100" />
-                                <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                                  Contrast Analysis
-                                </span>
-                                <div className="h-px flex-1 bg-slate-100" />
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
-                                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                                    Ineffective
-                                  </span>
-                                  <p className="text-slate-600 font-mono text-base leading-relaxed whitespace-pre-line">
-                                    {log.comparisonBad}
-                                  </p>
+                            (() => {
+                              const isTechniqueSelectionContrast =
+                                log.technique === "Technique Selection";
+
+                              const parseTechniqueSelectionExample = (
+                                text: string,
+                              ) => {
+                                const match = text.match(
+                                  /^Task:\s*(.+)\nTechnique:\s*(.+)\nPrompt:\n([\s\S]*)$/,
+                                );
+                                if (!match) {
+                                  return { task: "", technique: "", prompt: text };
+                                }
+                                return {
+                                  task: match[1].trim(),
+                                  technique: match[2].trim(),
+                                  prompt: match[3].trim(),
+                                };
+                              };
+
+                              const badParsed = isTechniqueSelectionContrast
+                                ? parseTechniqueSelectionExample(log.comparisonBad)
+                                : { task: "", technique: "", prompt: log.comparisonBad };
+                              const goodParsed = isTechniqueSelectionContrast
+                                ? parseTechniqueSelectionExample(log.comparisonGood)
+                                : { task: "", technique: "", prompt: log.comparisonGood };
+                              const sharedTask =
+                                badParsed.task &&
+                                badParsed.task === goodParsed.task
+                                  ? badParsed.task
+                                  : "";
+
+                              return (
+                                <div className="space-y-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-slate-100" />
+                                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                                      Contrast Analysis
+                                    </span>
+                                    <div className="h-px flex-1 bg-slate-100" />
+                                  </div>
+                                  {isTechniqueSelectionContrast && sharedTask && (
+                                    <div className="p-5 rounded-xl border border-slate-200 bg-white shadow-sm">
+                                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">
+                                        Task
+                                      </p>
+                                      <p className="text-slate-700 text-base leading-relaxed font-medium">
+                                        {sharedTask}
+                                      </p>
+                                    </div>
+                                  )}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                                      <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+                                        Ineffective
+                                      </span>
+                                      {isTechniqueSelectionContrast &&
+                                        badParsed.technique && (
+                                          <p className="text-sm font-semibold text-slate-500">
+                                            Technique: {badParsed.technique}
+                                          </p>
+                                        )}
+                                      <p className="text-slate-600 font-mono text-base leading-relaxed whitespace-pre-line">
+                                        {badParsed.prompt}
+                                      </p>
+                                    </div>
+                                    <div className="p-6 rounded-2xl bg-white border border-brand-pink/10 shadow-sm space-y-3">
+                                      <span className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
+                                        Effective
+                                      </span>
+                                      {isTechniqueSelectionContrast &&
+                                        goodParsed.technique && (
+                                          <p className="text-sm font-semibold text-brand-pink">
+                                            Technique: {goodParsed.technique}
+                                          </p>
+                                        )}
+                                      <p className="text-slate-800 font-mono text-base leading-relaxed whitespace-pre-line">
+                                        {goodParsed.prompt}
+                                      </p>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="p-6 rounded-2xl bg-white border border-brand-pink/10 shadow-sm space-y-3">
-                                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-brand-pink">
-                                    Effective
-                                  </span>
-                                  <p className="text-slate-800 font-mono text-base leading-relaxed whitespace-pre-line">
-                                    {log.comparisonGood}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+                              );
+                            })()
                           ) : (
                             <div className="markdown-content text-slate-600 leading-relaxed font-serif text-xl italic">
                               <ReactMarkdown
@@ -1116,8 +1205,9 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                               You completed Prompt Mentor
                             </h3>
                             <p className="text-lg text-slate-600 leading-relaxed">
-                              You practiced the three core techniques in this
-                              tutor and completed all 6 exercises.
+                              You practiced the core techniques and technique
+                              selection in this tutor and completed all 8
+                              exercises.
                             </p>
                           </div>
 

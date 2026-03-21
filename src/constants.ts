@@ -30,6 +30,16 @@ export const COT_RUBRIC: Rubric = {
   thresholds: { green: 3, yellow: 2 },
 };
 
+export const TECHNIQUE_SELECTION_RUBRIC: Rubric = {
+  criteria: [
+    { id: 'technique_fit', label: 'Technique Fit', description: 'Selects the most appropriate technique for the task and model behavior needed' },
+    { id: 'technique_signal', label: 'Technique Signal', description: 'Prompt structure clearly reflects the chosen technique' },
+    { id: 'execution_quality', label: 'Execution Quality', description: 'Applies the selected technique correctly in the prompt structure' },
+    { id: 'output_control', label: 'Output Control', description: 'Includes clear constraints for output quality, format, or completeness' },
+  ],
+  thresholds: { green: 3, yellow: 2 },
+};
+
 export const MODULES: Module[] = [
   {
     id: 'Zero-shot',
@@ -221,6 +231,81 @@ export const MODULES: Module[] = [
             task: 'Task: Write a prompt to solve a workplace logic puzzle (e.g., scheduling 3 people across 3 projects with constraints, or prioritizing tasks given deadlines and dependencies). Ensure the AI shows its reasoning steps.',
             referencePrompt: 'Assign 3 team members (Alice, Bob, Carol) to 3 projects (Website, Mobile App, API). Constraints: Alice has frontend expertise so she must work on Website or Mobile App. Bob cannot work on the same project type as last quarter (he did API). Carol is the only one with backend certification required for API. Think step by step: First, identify any forced assignments from constraints. Second, assign remaining people. Third, verify all constraints are satisfied.',
             rubric: COT_RUBRIC,
+          },
+        },
+      },
+    },
+  },
+  {
+    id: 'Technique Selection',
+    title: 'Technique Selection',
+    description: 'Selecting the best prompt engineering technique for a task, then applying it effectively.',
+    byPersona: {
+      'Academic Setting': {
+        badExample: 'Task: Classify many feedback comments into 4 categories.\nTechnique: Zero-shot\nPrompt:\nClassify these comments into categories.',
+        goodExample: 'Task: Classify many feedback comments into 4 categories.\nTechnique: Few-shot\nPrompt:\nFeedback: "Thesis is clear, but evidence is weak."\nCategory: Content\n\nFeedback: "Transitions are abrupt."\nCategory: Organization\n\nFeedback: "Conclusion introduces a new claim."\nCategory:',
+        instruction: '### How to choose the right technique:\n1. **Match task pattern:** Repeated labeling/classification often benefits from Few-shot.\n2. **Use Zero-shot for direct generation:** Clear one-off outputs usually need strong constraints.\n3. **Use CoT for reasoning:** Multi-constraint logic or planning tasks often need step-by-step reasoning.\n4. **Show the choice through structure:** Let the prompt format naturally reflect the technique you selected.',
+        levels: {
+          1: {
+            title: 'Technique Match',
+            task: 'Select from given options. You need to classify 60 short student feedback comments into 4 rubric categories with consistent labels. Which technique is the best first choice?',
+            choices: [
+              {
+                text: 'Zero-shot: Give one instruction and ask the AI to classify all comments directly.',
+                isCorrect: false,
+                explanation: 'Zero-shot may work, but consistency across many similar items is less reliable without examples.',
+              },
+              {
+                text: 'Few-shot: Provide a few labeled examples, then ask the AI to continue the same labeling pattern.',
+                isCorrect: true,
+                explanation: 'Few-shot is the best fit because consistent pattern continuation improves labeling reliability.',
+              },
+              {
+                text: 'Chain-of-Thought: Ask the AI to reason step by step before every label.',
+                isCorrect: false,
+                explanation: 'CoT can add verbosity and may not be necessary for straightforward repeated classification.',
+              },
+            ],
+          },
+          2: {
+            title: 'Application',
+            task: 'Task: Choose the best technique (Zero-shot, Few-shot, or Chain-of-Thought) for classifying short essay feedback into categories, then write a prompt that applies your chosen technique. Include constraints for output format consistency.',
+            referencePrompt: 'Classify each feedback comment into one category: Content, Organization, Mechanics, or Citation.\nUse exactly this format for every item:\nFeedback: "<text>"\nCategory: <one label>\n\nFeedback: "Your thesis is clear, but your supporting evidence is thin."\nCategory: Content\n\nFeedback: "Paragraph order is logical, but transitions are weak."\nCategory: Organization\n\nFeedback: "There are repeated punctuation errors in this section."\nCategory: Mechanics\n\nFeedback: "Please add page numbers to the quoted material."\nCategory: Citation\n\nFeedback: "Your conclusion introduces a new argument not discussed earlier."\nCategory:',
+            rubric: TECHNIQUE_SELECTION_RUBRIC,
+          },
+        },
+      },
+      'Working Professional': {
+        badExample: 'Task: Prioritize 5 tasks with dependencies.\nTechnique: Zero-shot\nPrompt:\nGive me the final priority order.',
+        goodExample: 'Task: Prioritize 5 tasks with dependencies.\nTechnique: Chain-of-Thought\nPrompt:\nThink step by step. First identify hard constraints, then order by dependencies, then verify no rule is violated. Return a numbered list with one-line rationale.',
+        instruction: '### How to choose the right technique:\n1. **Zero-shot:** Best for direct outputs with clear format and constraints.\n2. **Few-shot:** Best when you need consistent style or classification patterns.\n3. **CoT:** Best for multi-step reasoning with dependencies or trade-offs.\n4. **Show the choice through structure:** The wording and format of the prompt should reveal the selected technique.',
+        levels: {
+          1: {
+            title: 'Technique Match',
+            task: 'Select from given options. You need to prioritize tasks across teams with dependencies, deadlines, and conflicting constraints. Which technique is the best first choice?',
+            choices: [
+              {
+                text: 'Zero-shot: Ask for a final prioritized list immediately.',
+                isCorrect: false,
+                explanation: 'For dependency-heavy prioritization, direct output without reasoning can miss constraints.',
+              },
+              {
+                text: 'Few-shot: Provide 2-3 simple examples and ask the AI to imitate.',
+                isCorrect: false,
+                explanation: 'Few-shot is less effective here because the core challenge is reasoning through constraints.',
+              },
+              {
+                text: 'Chain-of-Thought: Ask for step-by-step reasoning, then a verified final plan.',
+                isCorrect: true,
+                explanation: 'CoT is best for complex planning because it improves transparency and constraint checking.',
+              },
+            ],
+          },
+          2: {
+            title: 'Application',
+            task: 'Task: Choose the best technique (Zero-shot, Few-shot, or Chain-of-Thought) for prioritizing cross-team work with dependencies, then write a prompt that applies your chosen technique. Include constraints for final output format.',
+            referencePrompt: 'Prioritize these 5 tasks for next week: API migration, dashboard QA, client onboarding docs, security patching, and analytics event cleanup.\nConstraints:\n- API migration must be completed before dashboard QA.\n- Security patching is mandatory before Friday.\n- Only one senior engineer is available on Tuesday and Wednesday.\n- Client onboarding docs are needed before Thursday afternoon.\n\nThink step by step:\n1) Identify hard constraints and fixed deadlines.\n2) Build a dependency-aware order.\n3) Resolve resource conflicts.\n4) Verify no constraints are violated.\n\nOutput format:\n- Final prioritized list (1-5)\n- One-line rationale per task\n- A final "Constraint Check" section with pass/fail for each rule.',
+            rubric: TECHNIQUE_SELECTION_RUBRIC,
           },
         },
       },

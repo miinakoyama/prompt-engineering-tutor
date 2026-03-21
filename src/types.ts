@@ -2,7 +2,15 @@ export type UserBackground = 'Academic Setting' | 'Working Professional';
 
 export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought' | 'Technique Selection';
 
+export type PromptingMethod = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
+
 export type Level = 1 | 2;
+
+export type FlowStage = 'pretest' | 'learning' | 'posttest' | 'done';
+
+export type AssessmentPhase = 'pre' | 'post';
+
+export type AssessmentTaskId = 1 | 2 | 3 | 4;
 
 export type PendingAction =
   | { kind: 'level'; level: Level }
@@ -82,4 +90,54 @@ export interface Module {
   title: string;
   description: string;
   byPersona: Record<UserBackground, ModuleContent>;
+}
+
+export interface AssessmentTask {
+  id: AssessmentTaskId;
+  title: string;
+  technique: Technique | 'Method Selection';
+  scenario: string;
+  requirement: string;
+  referencePrompt: string;
+  referenceMethod?: PromptingMethod;
+  referenceRationale?: string;
+  rubric: Rubric;
+  requiresMethodSelection?: boolean;
+}
+
+export interface AssessmentAnswer {
+  prompt: string;
+  method?: PromptingMethod;
+  rationale?: string;
+}
+
+export type AssessmentAnswers = Record<AssessmentTaskId, AssessmentAnswer>;
+
+export interface AssessmentTaskScore {
+  taskId: AssessmentTaskId;
+  promptScore: FeedbackScore;
+  methodRationaleScore?: FeedbackScore;
+}
+
+export interface AssessmentScoreSet {
+  phase: AssessmentPhase;
+  taskScores: AssessmentTaskScore[];
+  totalScore: number;
+  maxScore: number;
+}
+
+export interface AssessmentSubmission {
+  phase: AssessmentPhase;
+  answers: AssessmentAnswers;
+}
+
+export interface AssessmentRecordPayload {
+  background: UserBackground;
+  pretest: AssessmentSubmission;
+  posttest: AssessmentSubmission;
+  scores: {
+    pretest: AssessmentScoreSet;
+    posttest: AssessmentScoreSet;
+  };
+  submittedAt: number;
 }

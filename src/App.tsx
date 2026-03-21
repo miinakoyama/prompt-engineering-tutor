@@ -8,8 +8,17 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight, Home, RotateCcw, Send } from "lucide-react";
 import { GoogleGenAI } from "@google/genai";
 import {
+  AssessmentAnswer,
+  AssessmentAnswers,
+  AssessmentPhase,
+  AssessmentRecordPayload,
+  AssessmentScoreSet,
+  AssessmentTask,
+  AssessmentTaskId,
+  FlowStage,
   LogEntry,
   PendingAction,
+  PromptingMethod,
   Technique,
   Level,
   UserBackground,
@@ -23,6 +32,10 @@ import {
   FEW_SHOT_RUBRIC,
   COT_RUBRIC,
   TECHNIQUE_SELECTION_RUBRIC,
+  METHOD_OPTIONS,
+  METHOD_RATIONALE_RUBRIC,
+  POST_TEST_TASKS,
+  PRE_TEST_TASKS,
 } from "./constants";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -46,6 +59,17 @@ function getRubricForTechnique(technique: Technique) {
       return COT_RUBRIC;
     case "Technique Selection":
       return TECHNIQUE_SELECTION_RUBRIC;
+  }
+}
+
+function getRubricForMethod(method: PromptingMethod): Rubric {
+  switch (method) {
+    case "Zero-shot":
+      return ZERO_SHOT_RUBRIC;
+    case "Few-shot":
+      return FEW_SHOT_RUBRIC;
+    case "Chain-of-Thought":
+      return COT_RUBRIC;
   }
 }
 
@@ -144,6 +168,17 @@ const EMPTY_PROGRESS: Record<Technique, Level[]> = {
   "Technique Selection": [],
 };
 
+const ASSESSMENT_TASK_IDS: AssessmentTaskId[] = [1, 2, 3, 4];
+
+function createEmptyAssessmentAnswers(): AssessmentAnswers {
+  return {
+    1: { prompt: "" },
+    2: { prompt: "" },
+    3: { prompt: "" },
+    4: { prompt: "", method: undefined, rationale: "" },
+  };
+}
+
 function getTechniqueFromPath(pathname: string): Technique | null {
   const normalized = pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
   switch (normalized) {
@@ -164,7 +199,34 @@ function getTechniqueFromPath(pathname: string): Technique | null {
   }
 }
 
+function getFlowStageFromPath(pathname: string): FlowStage | null {
+  const normalized = pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+  switch (normalized) {
+    case "pre":
+    case "pretest":
+      return "pretest";
+    case "post":
+    case "posttest":
+      return "posttest";
+    default:
+      return null;
+  }
+}
+
 export default function App() {
+  const [flowStage, setFlowStage] = useState<FlowStage>(() => {
+    if (typeof window === "undefined") {
+      return "pretest";
+    }
+    const stageFromPath = getFlowStageFromPath(window.location.pathname);
+    if (stageFromPath) {
+      return stageFromPath;
+    }
+    if (getTechniqueFromPath(window.location.pathname)) {
+      return "learning";
+    }
+    return "pretest";
+  });
   const [background, setBackground] = useState<UserBackground | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [currentTechnique, setCurrentTechnique] =
@@ -181,12 +243,39 @@ export default function App() {
     Record<string, boolean>
   >({});
   const [focusLogId, setFocusLogId] = useState<string | null>(null);
+  const [pretestAnswers, setPretestAnswers] = useState<AssessmentAnswers>(
+    createEmptyAssessmentAnswers(),
+  );
+  const [posttestAnswers, setPosttestAnswers] = useState<AssessmentAnswers>(
+    createEmptyAssessmentAnswers(),
+  );
+  const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
+  const [, setAssessmentRecords] = useState<AssessmentRecordPayload[]>([]);
   const [deepLinkedTechnique] = useState<Technique | null>(() => {
     if (typeof window === "undefined") {
       return null;
     }
     return getTechniqueFromPath(window.location.pathname);
   });
+
+  useEffect(() => {
+    const stageFromPath = getFlowStageFromPath(window.location.pathname);
+    if (stageFromPath === "posttest") {
+      // Allow direct access to /post for testing workflows.
+      setBackground("Academic Setting");
+      return;
+    }
+
+    if (deepLinkedTechnique) {
+      // Developer shortcut: jump directly into a module route like /few.
+      setFlowStage("learning");
+      setBackground("Academic Setting");
+      setCompletedLevels(EMPTY_PROGRESS);
+      setExpandedResults({});
+      setPendingAction(null);
+      startModule(deepLinkedTechnique, "Academic Setting");
+    }
+  }, [deepLinkedTechnique]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -205,6 +294,198 @@ export default function App() {
       setFocusLogId(null);
     });
   }, [focusLogId, logs]);
+
+  const isAssessmentComplete = (
+    tasks: AssessmentTask[],
+    answers: AssessmentAnswers,
+  ) => {
+    return tasks.every((task) => {
+      const answer = answers[task.id];
+      if (!answer?.prompt.trim()) {
+        return false;
+      }
+      if (task.requiresMethodSelection) {
+        return Boolean(answer.method && answer.rationale?.trim());
+      }
+      return true;
+    });
+  };
+
+  const updateAssessmentAnswer = (
+    phase: AssessmentPhase,
+    taskId: AssessmentTaskId,
+    patch: Partial<AssessmentAnswer>,
+  ) => {
+    const updater = (prev: AssessmentAnswers): AssessmentAnswers => ({
+      ...prev,
+      [taskId]: {
+        ...prev[taskId],
+        ...patch,
+      },
+    });
+
+    if (phase === "pre") {
+      setPretestAnswers(updater);
+      return;
+    }
+    setPosttestAnswers(updater);
+  };
+
+  const buildPromptScoringRequest = (
+    task: AssessmentTask,
+    learnerPrompt: string,
+    rubric: Rubric,
+  ) => {
+    const criteriaList = rubric.criteria
+      .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
+      .join("\n");
+
+    return `You are a prompt-writing evaluator.
+
+SCENARIO:
+${task.scenario}
+
+REQUIREMENT:
+${task.requirement}
+
+REFERENCE PROMPT:
+"""${task.referencePrompt}"""
+
+LEARNER PROMPT:
+"""${learnerPrompt}"""
+
+EVALUATION CRITERIA:
+${criteriaList}
+
+For each criterion, return met true/false.
+
+Respond with ONLY valid JSON:
+{
+  "scores": {
+${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\n")}
+  },
+  "feedback": "1-2 concise evaluator notes."
+}`;
+  };
+
+  const buildMethodRationaleScoringRequest = (
+    task: AssessmentTask,
+    selectedMethod: PromptingMethod,
+    rationale: string,
+  ) => {
+    const rubric = METHOD_RATIONALE_RUBRIC;
+    const criteriaList = rubric.criteria
+      .map((criterion) => `- ${criterion.id}: ${criterion.description}`)
+      .join("\n");
+
+    return `You are evaluating method selection for prompt engineering.
+
+TASK:
+${task.requirement}
+
+REFERENCE METHOD:
+${task.referenceMethod || "N/A"}
+
+REFERENCE RATIONALE:
+${task.referenceRationale || "N/A"}
+
+LEARNER METHOD:
+${selectedMethod}
+
+LEARNER RATIONALE:
+${rationale}
+
+EVALUATION CRITERIA:
+${criteriaList}
+
+Respond with ONLY valid JSON:
+{
+  "scores": {
+${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\n")}
+  },
+  "feedback": "1-2 concise evaluator notes."
+}`;
+  };
+
+  const gradeAssessmentPhase = async (
+    phase: AssessmentPhase,
+    tasks: AssessmentTask[],
+    answers: AssessmentAnswers,
+  ): Promise<AssessmentScoreSet> => {
+    const taskScores = await Promise.all(
+      tasks.map(async (task) => {
+        const answer = answers[task.id];
+        const promptRubric =
+          task.requiresMethodSelection && answer.method
+            ? getRubricForMethod(answer.method)
+            : task.rubric;
+
+        const promptScoreText = await callGeminiWithRetry(
+          buildPromptScoringRequest(task, answer.prompt, promptRubric),
+        );
+        const promptScore =
+          parseGradingResponse(promptScoreText, promptRubric) || {
+            totalScore: 0,
+            maxScore: promptRubric.criteria.length,
+            grade: "red" as const,
+            criteriaScores: promptRubric.criteria.map((criterion) => ({
+              id: criterion.id,
+              label: criterion.label,
+              score: 0 as const,
+              reason: "",
+            })),
+          };
+
+        let methodRationaleScore: FeedbackScore | undefined;
+        if (task.requiresMethodSelection && answer.method) {
+          const methodScoreText = await callGeminiWithRetry(
+            buildMethodRationaleScoringRequest(
+              task,
+              answer.method,
+              answer.rationale || "",
+            ),
+          );
+          methodRationaleScore =
+            parseGradingResponse(methodScoreText, METHOD_RATIONALE_RUBRIC) ||
+            undefined;
+        }
+
+        return {
+          taskId: task.id,
+          promptScore,
+          methodRationaleScore,
+        };
+      }),
+    );
+
+    const totalScore = taskScores.reduce((sum, taskScore) => {
+      return (
+        sum +
+        taskScore.promptScore.totalScore +
+        (taskScore.methodRationaleScore?.totalScore || 0)
+      );
+    }, 0);
+
+    const maxScore = taskScores.reduce((sum, taskScore) => {
+      return (
+        sum +
+        taskScore.promptScore.maxScore +
+        (taskScore.methodRationaleScore?.maxScore || 0)
+      );
+    }, 0);
+
+    return {
+      phase,
+      taskScores,
+      totalScore,
+      maxScore,
+    };
+  };
+
+  const persistAssessment = (payload: AssessmentRecordPayload) => {
+    setAssessmentRecords((prev) => [...prev, payload]);
+    console.info("Assessment data captured", payload);
+  };
 
   const addLog = (entry: Omit<LogEntry, "id" | "timestamp">) => {
     const id = Math.random().toString(36).slice(2, 11);
@@ -263,6 +544,7 @@ export default function App() {
   };
 
   const handleBackgroundSelect = (selectedBackground: UserBackground) => {
+    setFlowStage("learning");
     setBackground(selectedBackground);
     setCompletedLevels(EMPTY_PROGRESS);
     setExpandedResults({});
@@ -271,6 +553,7 @@ export default function App() {
   };
 
   const handleReset = () => {
+    setFlowStage("pretest");
     setBackground(null);
     setLogs([]);
     setCurrentTechnique("Zero-shot");
@@ -281,6 +564,9 @@ export default function App() {
     setCompletedLevels(EMPTY_PROGRESS);
     setExpandedResults({});
     setFocusLogId(null);
+    setPretestAnswers(createEmptyAssessmentAnswers());
+    setPosttestAnswers(createEmptyAssessmentAnswers());
+    setIsSubmittingAssessment(false);
   };
 
   const handleRestartTrack = () => {
@@ -334,11 +620,7 @@ export default function App() {
     }
 
     setPendingAction(null);
-    const logId = addLog({
-      type: "completion",
-      content: "Course complete",
-    });
-    setFocusLogId(logId);
+    setFlowStage("posttest");
   };
 
   const handleChoiceSelect = (
@@ -529,6 +811,47 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     }
   };
 
+  const handlePretestSubmit = () => {
+    if (!isAssessmentComplete(PRE_TEST_TASKS, pretestAnswers)) {
+      return;
+    }
+    setFlowStage("learning");
+  };
+
+  const handlePosttestSubmit = async () => {
+    if (!background || !isAssessmentComplete(POST_TEST_TASKS, posttestAnswers)) {
+      return;
+    }
+
+    setIsSubmittingAssessment(true);
+    try {
+      const [preScores, postScores] = await Promise.all([
+        gradeAssessmentPhase("pre", PRE_TEST_TASKS, pretestAnswers),
+        gradeAssessmentPhase("post", POST_TEST_TASKS, posttestAnswers),
+      ]);
+
+      persistAssessment({
+        background,
+        pretest: { phase: "pre", answers: pretestAnswers },
+        posttest: { phase: "post", answers: posttestAnswers },
+        scores: {
+          pretest: preScores,
+          posttest: postScores,
+        },
+        submittedAt: Date.now(),
+      });
+      setFlowStage("done");
+    } catch (error) {
+      console.error("Assessment scoring error:", error);
+      addLog({
+        type: "intro",
+        content: "Failed to submit assessment data. Please try again.",
+      });
+    } finally {
+      setIsSubmittingAssessment(false);
+    }
+  };
+
   const currentTechniqueIndex = MODULES.findIndex(
     (module) => module.id === currentTechnique,
   );
@@ -632,6 +955,140 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
     </div>
   );
 
+  const renderAssessmentScreen = (
+    phase: AssessmentPhase,
+    tasks: AssessmentTask[],
+    answers: AssessmentAnswers,
+  ) => {
+    const isComplete = isAssessmentComplete(tasks, answers);
+    const submitLabel = phase === "pre" ? "Start Learning Modules" : "Submit";
+    const submitAction =
+      phase === "pre" ? handlePretestSubmit : handlePosttestSubmit;
+
+    return (
+      <main className="flex-1 overflow-y-auto">
+        <div className="w-full px-5 lg:px-10 xl:px-14 2xl:px-20 py-10">
+          <div className="max-w-5xl mx-auto space-y-8 pb-24">
+            <div className="space-y-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-pink">
+                {phase === "pre" ? "Pre-Test" : "Post-Test"}
+              </p>
+              <h1 className="text-4xl font-serif font-light text-slate-900">
+                Prompt Engineering {phase === "pre" ? "Pre" : "Post"}-Test
+              </h1>
+              <p className="text-base text-slate-600 leading-relaxed">
+                {phase === "pre"
+                  ? "Answer the following tasks to capture your baseline."
+                  : "Answer the following tasks to capture your post-learning performance."}
+              </p>
+            </div>
+
+            {tasks.map((task) => (
+              <section
+                key={task.id}
+                className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-5"
+              >
+                <div className="space-y-2">
+                  <p className="text-sm font-bold uppercase tracking-[0.14em] text-brand-orange">
+                    {task.title}
+                  </p>
+                  <p className="text-slate-700 leading-relaxed">
+                    <span className="font-semibold">Scenario:</span>{" "}
+                    {task.scenario}
+                  </p>
+                  <p className="text-slate-700 leading-relaxed">
+                    <span className="font-semibold">Requirement:</span>{" "}
+                    {task.requirement}
+                  </p>
+                </div>
+
+                {task.requiresMethodSelection && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                      Method
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {METHOD_OPTIONS.map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() =>
+                            updateAssessmentAnswer(phase, task.id, { method })
+                          }
+                          className={cn(
+                            "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                            answers[task.id].method === method
+                              ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
+                              : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                          )}
+                        >
+                          {method}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      placeholder="Rationale (briefly explain why you chose this method)..."
+                      value={answers[task.id].rationale || ""}
+                      onChange={(event) =>
+                        updateAssessmentAnswer(phase, task.id, {
+                          rationale: event.target.value,
+                        })
+                      }
+                      className="w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[90px]"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                    Prompt
+                  </p>
+                  <textarea
+                    placeholder="Write your prompt..."
+                    value={answers[task.id].prompt}
+                    onChange={(event) =>
+                      updateAssessmentAnswer(phase, task.id, {
+                        prompt: event.target.value,
+                      })
+                    }
+                    className="w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
+                  />
+                </div>
+              </section>
+            ))}
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={submitAction}
+                disabled={!isComplete || isSubmittingAssessment}
+                className={cn(
+                  "w-full py-4 rounded-xl font-bold text-sm uppercase tracking-[0.14em] shadow-lg transition-all",
+                  !isComplete || isSubmittingAssessment
+                    ? "bg-slate-200 text-slate-500 cursor-not-allowed shadow-none"
+                    : "gradient-bg text-white shadow-brand-pink/20 hover:scale-[1.01]",
+                )}
+              >
+                {isSubmittingAssessment ? "Submitting..." : submitLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  };
+
+  const headerStageLabel =
+    flowStage === "pretest"
+      ? "Pre-Test"
+      : flowStage === "posttest"
+        ? "Post-Test"
+        : flowStage === "done"
+          ? "Completed"
+          : background
+            ? `${currentTechnique} | Level ${currentLevel}`
+            : "Learning Setup";
+
   return (
     <div className="h-screen flex flex-col bg-[#fcfcfc] text-slate-800 font-sans">
       <header className="h-16 border-b border-slate-100 flex items-center justify-between px-10 shrink-0 bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
@@ -646,19 +1103,13 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
               Prompt Mentor
             </h2>
           </button>
-          {background && (
-            <>
-              <div className="h-4 w-px bg-slate-200" />
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
-                {currentTechnique}{" "}
-                <span className="mx-2 text-slate-200">|</span> Level{" "}
-                {currentLevel}
-              </p>
-            </>
-          )}
+          <div className="h-4 w-px bg-slate-200" />
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">
+            {headerStageLabel}
+          </p>
         </div>
         <div className="flex items-center gap-4">
-          {background ? (
+          {background && flowStage !== "pretest" ? (
             <div className="h-8 px-4 rounded-full border border-slate-100 bg-slate-50/50 flex items-center">
               <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 {background}
@@ -668,7 +1119,25 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
         </div>
       </header>
 
-      {!background ? (
+      {flowStage === "pretest" ? (
+        renderAssessmentScreen("pre", PRE_TEST_TASKS, pretestAnswers)
+      ) : flowStage === "posttest" ? (
+        renderAssessmentScreen("post", POST_TEST_TASKS, posttestAnswers)
+      ) : flowStage === "done" ? (
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-xl w-full p-10 text-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-pink mb-4">
+              Completed
+            </p>
+            <h3 className="text-4xl font-serif font-light text-slate-900 mb-3">
+              Thank you.
+            </h3>
+            <p className="text-base text-slate-600 leading-relaxed">
+              Your responses have been submitted.
+            </p>
+          </div>
+        </main>
+      ) : !background ? (
         <div className="flex-1 flex items-center justify-center p-6">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -891,7 +1360,7 @@ ${rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\
                             <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
                               {log.title}
                             </p>
-                            <p className="text-3xl font-serif font-light text-slate-900 leading-relaxed whitespace-pre-line">
+                            <p className="text-2xl font-serif font-light text-slate-900 leading-relaxed whitespace-pre-line">
                               {log.task}
                             </p>
                           </div>

@@ -1,8 +1,16 @@
-export type UserBackground = 'Student' | 'Teacher' | 'Working Professional';
+export type UserBackground = 'Academic Setting' | 'Working Professional';
 
-export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
+export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought' | 'Technique Selection';
 
-export type Level = 1 | 2 | 3;
+export type PromptingMethod = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
+
+export type Level = 1 | 2;
+
+export type FlowStage = 'pretest' | 'learning' | 'posttest' | 'done';
+
+export type AssessmentPhase = 'pre' | 'post';
+
+export type AssessmentTaskId = 1 | 2 | 3 | 4;
 
 export type PendingAction =
   | { kind: 'level'; level: Level }
@@ -29,7 +37,13 @@ export interface LogEntry {
   content: string;
   prediction?: string;
   prompt?: string;
+  generatedResponse?: string;
   selectedChoice?: string;
+  selectedMethod?: PromptingMethod;
+  selectedRationale?: string;
+  methodStepCompleted?: boolean;
+  methodFeedback?: string;
+  methodFeedbackScore?: FeedbackScore;
   isCorrect?: boolean;
   explanation?: string;
   technique?: Technique;
@@ -37,7 +51,6 @@ export interface LogEntry {
   submittedPrompt?: string;
   title?: string;
   task?: string;
-  previousPrompt?: string;
   reviewType?: 'choice' | 'feedback';
   comparisonBad?: string;
   comparisonGood?: string;
@@ -67,6 +80,8 @@ export interface ModuleLevel {
   blanks?: string[];
   template?: string;
   referencePrompt?: string;
+  referenceMethod?: PromptingMethod;
+  referenceRationale?: string;
   rubric?: Rubric;
 }
 
@@ -82,4 +97,61 @@ export interface Module {
   title: string;
   description: string;
   byPersona: Record<UserBackground, ModuleContent>;
+}
+
+export interface AssessmentTask {
+  id: AssessmentTaskId;
+  title: string;
+  technique: Technique | 'Method Selection';
+  scenario: string;
+  requirement: string;
+  referencePrompt: string;
+  referenceMethod?: PromptingMethod;
+  referenceRationale?: string;
+  rubric: Rubric;
+  requiresMethodSelection?: boolean;
+}
+
+export interface AssessmentAnswer {
+  prompt: string;
+  method?: PromptingMethod;
+  rationale?: string;
+}
+
+export type AssessmentAnswers = Record<AssessmentTaskId, AssessmentAnswer>;
+
+export interface AssessmentTaskScore {
+  taskId: AssessmentTaskId;
+  promptScore: FeedbackScore;
+  methodRationaleScore?: FeedbackScore;
+}
+
+export interface AssessmentScoreSet {
+  phase: AssessmentPhase;
+  taskScores: AssessmentTaskScore[];
+  totalScore: number;
+  maxScore: number;
+}
+
+export interface AssessmentSubmission {
+  phase: AssessmentPhase;
+  answers: AssessmentAnswers;
+}
+
+export interface AssessmentRecordPayload {
+  background: UserBackground;
+  preSurvey: {
+    skillLevel: string;
+    confidence: string;
+  };
+  postSurvey: {
+    confidence: string;
+  };
+  pretest: AssessmentSubmission;
+  posttest: AssessmentSubmission;
+  scores: {
+    pretest: AssessmentScoreSet;
+    posttest: AssessmentScoreSet;
+  };
+  submittedAt: number;
 }

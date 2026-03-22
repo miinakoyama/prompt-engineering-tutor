@@ -171,21 +171,35 @@ export async function fetchAdminData(passcode: string, limit = 100) {
   return response.json();
 }
 
-export function runAdminGrading(passcode: string, limit = 20) {
+export function runAdminGrading(
+  passcode: string,
+  limit = 20,
+  appEnv?: "all" | "local" | "production",
+) {
   return postJson<{
     ok: boolean;
     gradedCount: number;
     failedCount: number;
-  }>("/api/admin/grade", { passcode, limit });
+  }>("/api/admin/grade", {
+    passcode,
+    limit,
+    appEnv: appEnv && appEnv !== "all" ? appEnv : undefined,
+  });
 }
 
 export async function fetchAdminExport(
   passcode: string,
   format: "json" | "csv",
+  appEnv?: "all" | "local" | "production",
 ) {
-  const response = await fetch(
-    `/api/admin/export?passcode=${encodeURIComponent(passcode)}&format=${format}`,
-  );
+  const searchParams = new URLSearchParams({
+    passcode,
+    format,
+  });
+  if (appEnv && appEnv !== "all") {
+    searchParams.set("appEnv", appEnv);
+  }
+  const response = await fetch(`/api/admin/export?${searchParams.toString()}`);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Request failed: ${response.status} ${text}`);

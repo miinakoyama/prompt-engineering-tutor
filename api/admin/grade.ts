@@ -20,6 +20,7 @@ type ApiResponse = {
 type GradeRequestBody = {
   passcode?: string;
   limit?: number;
+  appEnv?: "local" | "production";
 };
 
 type AttemptRow = {
@@ -158,15 +159,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    const limit = Math.max(1, Math.min(body.limit || 20, 100));
+    const limit = Math.max(1, Math.min(body.limit || 20, 200));
+    const appEnvFilter =
+      body.appEnv === "local" || body.appEnv === "production"
+        ? body.appEnv
+        : null;
 
-    const { data: attempts, error } = await supabaseAdmin
+    let attemptsQuery = supabaseAdmin
       .from("attempts")
       .select("id,question_key,phase,prompt_raw,selected_method,selected_rationale")
       .in("phase", ["pretest", "posttest"])
       .eq("grading_status", "pending")
-      .order("submitted_at", { ascending: true })
-      .limit(limit);
+      .order("submitted_at", { ascending: true });
+    if (appEnvFilter) {
+      attemptsQuery = attemptsQuery.eq("app_env", appEnvFilter);
+    }
+    const { data: attempts, error } = await attemptsQuery.limit(limit);
 
     if (error) throw error;
     const pendingAttempts = (attempts || []) as AttemptRow[];
@@ -288,6 +296,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     res.status(200).json({
       ok: true,
+      appEnv: appEnvFilter || "all",
       requestedLimit: limit,
       gradedCount: gradedAttemptIds.length,
       failedCount: failedAttemptIds.length,

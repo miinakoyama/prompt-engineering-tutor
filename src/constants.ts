@@ -442,7 +442,7 @@ export const MODULES: Module[] = [
           },
           2: {
             title: "Application",
-            task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle. The school must deliver a fragile chemistry apparatus from City A to City D. Route 1: A-B-D, cost $40, risk 5%, time 4h. Route 2: A-C-D, cost $30, risk 20%, time 3h. Constraint: budget is $40, and if risk is over 15%, insurance adds $15. Your prompt should make the AI reason step by step and choose the best route.',
+            task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle.\n\nThe school must deliver a fragile chemistry apparatus from City A to City D.\nRoute 1: A-B-D, cost $40, risk 5%, time 4h.\nRoute 2: A-C-D, cost $30, risk 20%, time 3h.\n\nConstraint: budget is $40, and if risk is over 15%, insurance adds $15.\nYour prompt should make the AI reason step by step and choose the best route.',
             referencePrompt:
               "A school needs to deliver a fragile chemistry apparatus from City A to City D. Route 1 (A-B-D): cost $40, risk 5%, time 4 hours. Route 2 (A-C-D): cost $30, risk 20%, time 3 hours. If risk is over 15%, insurance adds $15. Budget limit is $40. Think step by step: (1) compute total cost for each route including insurance when needed, (2) compare risk and delivery time, (3) verify budget compliance, and (4) recommend the best route with a short justification.",
             rubric: COT_RUBRIC,
@@ -483,7 +483,7 @@ export const MODULES: Module[] = [
           },
           2: {
             title: "Application",
-            task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle. A company needs to deliver a fragile medical package from City A to City D. Route 1: A-B-D, cost $40, risk 5%, time 4h. Route 2: A-C-D, cost $30, risk 20%, time 3h. Constraint: budget is $40, and if risk is over 15%, insurance adds $15. Your prompt should force step-by-step reasoning and a final recommendation.',
+            task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle. A company needs to deliver a fragile medical package from City A to City D.\nRoute 1: A-B-D, cost $40, risk 5%, time 4h.\nRoute 2: A-C-D, cost $30, risk 20%, time 3h.\nConstraint: budget is $40, and if risk is over 15%, insurance adds $15.\nYour prompt should force step-by-step reasoning and a final recommendation.',
             referencePrompt:
               "A company needs to deliver a fragile medical package from City A to City D. Route 1 (A-B-D): cost $40, risk 5%, time 4 hours. Route 2 (A-C-D): cost $30, risk 20%, time 3 hours. If risk is over 15%, insurance adds $15. Budget is $40. Think step by step: First compute each route's final cost including insurance. Second compare risk and delivery time. Third verify whether each route stays within budget. Finally choose the best route and explain the decision clearly.",
             rubric: COT_RUBRIC,

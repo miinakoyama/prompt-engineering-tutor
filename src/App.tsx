@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowRight, Home, RotateCcw, Send } from "lucide-react";
+import { ArrowRight, Home, Loader2, RotateCcw, Send } from "lucide-react";
 import {
   AssessmentAnswer,
   AssessmentAnswers,
@@ -234,15 +234,51 @@ export default function App() {
   const [adminData, setAdminData] = useState<any | null>(null);
   const [adminError, setAdminError] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
+  const [adminGrading, setAdminGrading] = useState(false);
+  const [adminGradeSummary, setAdminGradeSummary] = useState<{
+    gradedCount: number;
+    failedCount: number;
+  } | null>(null);
+  const [adminGradeConfirmOpen, setAdminGradeConfirmOpen] = useState(false);
+  const [adminRestoringSession, setAdminRestoringSession] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const normalizedPath = window.location.pathname
+      .replace(/^\/+|\/+$/g, "")
+      .toLowerCase();
+    if (normalizedPath !== "admin") {
+      return false;
+    }
+    return Boolean(window.sessionStorage.getItem("promptMentorAdminPasscode"));
+  });
   const [adminEnvFilter, setAdminEnvFilter] = useState<
     "all" | "local" | "production"
   >("all");
+  const [adminDownloadFormat, setAdminDownloadFormat] = useState<
+    "csv" | "json"
+  >("csv");
   const [deepLinkedTechnique] = useState<Technique | null>(() => {
     if (typeof window === "undefined") {
       return null;
     }
     return getTechniqueFromPath(window.location.pathname);
   });
+
+  useEffect(() => {
+    if (!isAdminRoute || typeof window === "undefined") {
+      return;
+    }
+    const savedPasscode = window.sessionStorage.getItem(
+      "promptMentorAdminPasscode",
+    );
+    if (!savedPasscode) {
+      setAdminRestoringSession(false);
+      return;
+    }
+    setAdminPasscode(savedPasscode);
+    void refreshAdminData(savedPasscode, { fromRestore: true });
+  }, [isAdminRoute]);
 
   useEffect(() => {
     const stageFromPath = getFlowStageFromPath(window.location.pathname);
@@ -845,6 +881,32 @@ export default function App() {
             : log,
         ),
       );
+      const questionKey = "learning-Technique Selection-2-method";
+      const startedAt = questionStartedAt[questionKey];
+      const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
+      if (sessionId) {
+        void saveAttempt({
+          sessionId,
+          phase: "learning",
+          technique: "Technique Selection",
+          level: 2,
+          questionKey,
+          questionTitle: "Technique Selection Method Review",
+          selectedMethod: targetLog.selectedMethod,
+          selectedRationale: targetLog.selectedRationale,
+          feedbackText,
+          gradingStatus: "graded",
+          scoreTotal: methodFeedbackScore.totalScore,
+          scoreMax: methodFeedbackScore.maxScore,
+          durationSec,
+          submittedAt: Date.now(),
+          gradedAt: Date.now(),
+          criteriaScores: methodFeedbackScore.criteriaScores,
+          metadata: { stage: "method_selection" },
+        }).catch((error) =>
+          console.error("Failed to save method review attempt", error),
+        );
+      }
       void saveEvent(
         "technique_selection_method_reviewed",
         {
@@ -1346,43 +1408,72 @@ export default function App() {
     );
   };
 
-  const refreshAdminData = async () => {
-    if (!adminPasscode) {
+  const refreshAdminData = async (
+    passcodeOverride?: string,
+    options?: { fromRestore?: boolean },
+  ) => {
+    const activePasscode = passcodeOverride ?? adminPasscode;
+    if (!activePasscode) {
+      if (options?.fromRestore) {
+        setAdminRestoringSession(false);
+      }
       return;
     }
     setAdminLoading(true);
     setAdminError("");
     try {
-      const data = await fetchAdminData(adminPasscode, 200);
+      const data = await fetchAdminData(activePasscode, 200);
       setAdminData(data);
       setAdminAuthorized(true);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          "promptMentorAdminPasscode",
+          activePasscode,
+        );
+      }
     } catch (error) {
       setAdminError("Failed to load admin data. Check your passcode.");
+      setAdminAuthorized(false);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("promptMentorAdminPasscode");
+      }
       console.error(error);
     } finally {
       setAdminLoading(false);
+      if (options?.fromRestore) {
+        setAdminRestoringSession(false);
+      }
     }
   };
 
   const handleRunAdminGrading = async () => {
     if (!adminPasscode) return;
-    setAdminLoading(true);
+    setAdminGrading(true);
+    setAdminGradeSummary(null);
     setAdminError("");
     try {
-      await runAdminGrading(adminPasscode, 50);
+      const result = await runAdminGrading(adminPasscode, 200, adminEnvFilter);
       await refreshAdminData();
+      setAdminGradeSummary({
+        gradedCount: result.gradedCount,
+        failedCount: result.failedCount,
+      });
     } catch (error) {
       setAdminError("Failed to run grading.");
       console.error(error);
     } finally {
-      setAdminLoading(false);
+      setAdminGrading(false);
     }
   };
 
   const handleExport = async (format: "json" | "csv") => {
     if (!adminPasscode) return;
     try {
-      const response = await fetchAdminExport(adminPasscode, format);
+      const response = await fetchAdminExport(
+        adminPasscode,
+        format,
+        adminEnvFilter,
+      );
       if (format === "json") {
         const data = await response.json();
         const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -1423,6 +1514,65 @@ export default function App() {
     const filteredSessions = sessions.filter(matchesEnvFilter);
     const filteredPendingAttempts = pendingAttempts.filter(matchesEnvFilter);
     const filteredAttempts = attempts.filter(matchesEnvFilter);
+    const uniqueUsers = new Set(
+      filteredSessions
+        .map((session: any) => (session.student_username || "").trim().toLowerCase())
+        .filter(Boolean),
+    ).size;
+    const attemptsBySessionId = filteredAttempts.reduce(
+      (acc: Record<string, any[]>, attempt: any) => {
+        if (!acc[attempt.session_id]) {
+          acc[attempt.session_id] = [];
+        }
+        acc[attempt.session_id].push(attempt);
+        return acc;
+      },
+      {},
+    );
+    const totalLearningSteps = MODULES.length * 2;
+    const getPhaseGradeStatus = (
+      attemptsForSession: any[],
+      phase: "pretest" | "posttest",
+    ) => {
+      const phaseAttempts = attemptsForSession.filter(
+        (attempt) => attempt.phase === phase,
+      );
+      if (!phaseAttempts.length) {
+        return "Not submitted";
+      }
+      if (phaseAttempts.every((attempt) => attempt.grading_status === "graded")) {
+        return "Graded";
+      }
+      if (phaseAttempts.some((attempt) => attempt.grading_status === "failed")) {
+        return "Needs retry";
+      }
+      return "Pending";
+    };
+    const getStatusBadgeClass = (status: string) => {
+      if (status === "Graded") {
+        return "bg-emerald-100 text-emerald-700";
+      }
+      if (status === "Pending") {
+        return "bg-amber-100 text-amber-700";
+      }
+      if (status === "Needs retry") {
+        return "bg-red-100 text-red-700";
+      }
+      return "bg-slate-100 text-slate-700";
+    };
+
+    if (adminRestoringSession) {
+      return (
+        <main className="flex-1 flex items-center justify-center p-6 bg-[#fcfcfc]">
+          <div className="max-w-lg w-full p-8 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-4 text-center">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-pink">
+              Admin
+            </p>
+            <p className="text-slate-700 text-lg">Loading dashboard...</p>
+          </div>
+        </main>
+      );
+    }
 
     if (!adminAuthorized) {
       return (
@@ -1434,10 +1584,6 @@ export default function App() {
             <h1 className="text-3xl font-serif font-light text-slate-900">
               Enter Admin Passcode
             </h1>
-            <p className="text-slate-600 leading-relaxed">
-              This dashboard includes grading tools and raw logs. Enter the
-              admin passcode to continue.
-            </p>
             <input
               type="password"
               value={adminPasscode}
@@ -1475,70 +1621,56 @@ export default function App() {
       <main className="flex-1 overflow-y-auto p-6 lg:p-10 bg-[#fcfcfc]">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-4">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-pink">
+            <p className="text-3xl font-serif font-light tracking-tight text-brand-pink">
               Admin Dashboard
             </p>
-            <p className="text-slate-600">
-              Review sessions, run post-hoc grading for pre/post attempts, and
-              export logs.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <select
-                value={adminEnvFilter}
-                onChange={(event) =>
-                  setAdminEnvFilter(
-                    event.target.value as "all" | "local" | "production",
-                  )
-                }
-                className="bg-white border border-slate-200 rounded-xl py-3 px-4 text-slate-700 focus:outline-none focus:border-brand-pink"
-              >
-                <option value="all">All environments</option>
-                <option value="local">local</option>
-                <option value="production">production</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void refreshAdminData()}
-                disabled={adminLoading}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold"
-              >
-                {adminLoading ? "Loading..." : "Load Data"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleRunAdminGrading()}
-                disabled={adminLoading || !adminAuthorized}
-                className="px-4 py-3 rounded-xl gradient-bg text-white font-semibold disabled:opacity-50"
-              >
-                Grade Pending
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleExport("csv")}
-                disabled={!adminAuthorized}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold disabled:opacity-50"
-              >
-                Export CSV
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleExport("json")}
-                disabled={!adminAuthorized}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold disabled:opacity-50"
-              >
-                Export JSON
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminAuthorized(false);
-                  setAdminData(null);
-                  setAdminError("");
-                }}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold"
-              >
-                Lock
-              </button>
+            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 lg:items-end">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Environment
+                </p>
+                <select
+                  value={adminEnvFilter}
+                  onChange={(event) =>
+                    setAdminEnvFilter(
+                      event.target.value as "all" | "local" | "production",
+                    )
+                  }
+                  className="bg-white border border-slate-200 rounded-xl py-3 px-4 text-slate-700 focus:outline-none focus:border-brand-pink"
+                >
+                  <option value="all">All environments</option>
+                  <option value="local">local</option>
+                  <option value="production">production</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Download
+                </p>
+                <div className="flex gap-2">
+                  <select
+                    value={adminDownloadFormat}
+                    onChange={(event) =>
+                      setAdminDownloadFormat(
+                        event.target.value as "csv" | "json",
+                      )
+                    }
+                    className="bg-white border border-slate-200 rounded-xl py-3 px-4 text-slate-700 focus:outline-none focus:border-brand-pink"
+                  >
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void handleExport(adminDownloadFormat)}
+                    disabled={!adminAuthorized}
+                    className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold transition-all hover:bg-slate-100 hover:border-slate-400 hover:shadow-sm disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-slate-200 disabled:hover:shadow-none"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
             </div>
             {adminError ? (
               <p className="text-sm text-red-600">{adminError}</p>
@@ -1564,59 +1696,174 @@ export default function App() {
             </div>
             <div className="p-5 rounded-xl border border-slate-200 bg-white">
               <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
-                Total Attempts
+                Unique Users
               </p>
               <p className="text-2xl font-semibold text-slate-900">
-                {filteredAttempts.length}
+                {uniqueUsers}
               </p>
             </div>
           </div>
 
           <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-3">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
-              Pending Attempts
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
+                Learner Progress
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void refreshAdminData()}
+                  disabled={adminLoading}
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold transition-all hover:bg-slate-100 hover:border-slate-400 hover:shadow-sm disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-slate-200 disabled:hover:shadow-none"
+                >
+                  {adminLoading ? "Loading..." : "Refresh Data"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminGradeConfirmOpen(true)}
+                  disabled={
+                    adminLoading ||
+                    adminGrading ||
+                    !adminAuthorized ||
+                    filteredPendingAttempts.length === 0
+                  }
+                  className="px-4 py-2 rounded-xl gradient-bg text-white font-semibold shadow-md shadow-brand-pink/20 transition-all hover:brightness-110 hover:shadow-lg disabled:opacity-50 disabled:shadow-none disabled:hover:brightness-100"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    {adminGrading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {adminGrading ? "Grading..." : "Grade Pre/Post"}
+                  </span>
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">
+              Pending pre/post attempts in this view: {filteredPendingAttempts.length}
             </p>
+            {adminGrading && (
+              <p className="text-xs text-brand-pink font-semibold">
+                Grading in progress. This may take a moment.
+              </p>
+            )}
+            {adminGradeSummary && !adminGrading && (
+              <p className="text-xs text-emerald-700 font-semibold">
+                Grading completed: {adminGradeSummary.gradedCount} graded,{" "}
+                {adminGradeSummary.failedCount} failed.
+              </p>
+            )}
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="text-left text-slate-500">
                     <th className="py-2 pr-4">Env</th>
+                    <th className="py-2 pr-4">Username</th>
                     <th className="py-2 pr-4">Session</th>
-                    <th className="py-2 pr-4">Phase</th>
-                    <th className="py-2 pr-4">Question</th>
-                    <th className="py-2 pr-4">Submitted</th>
+                    <th className="py-2 pr-4">Learning</th>
+                    <th className="py-2 pr-4">Pre-Test Grade</th>
+                    <th className="py-2 pr-4">Post-Test Grade</th>
+                    <th className="py-2 pr-4">Flow Stage</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPendingAttempts.map((attempt: any) => (
-                    <tr key={attempt.id} className="border-t border-slate-100">
-                      <td className="py-2 pr-4">
-                        <span
-                          className={cn(
-                            "px-2 py-1 rounded-full text-xs font-semibold",
-                            (attempt.app_env || "").toLowerCase() ===
-                              "production"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-700",
-                          )}
-                        >
-                          {(attempt.app_env || "unknown").toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4 font-mono text-xs">
-                        {attempt.session_id}
-                      </td>
-                      <td className="py-2 pr-4">{attempt.phase}</td>
-                      <td className="py-2 pr-4">{attempt.question_key}</td>
-                      <td className="py-2 pr-4">
-                        {new Date(attempt.submitted_at).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredSessions.map((session: any) => {
+                    const sessionAttempts = attemptsBySessionId[session.id] || [];
+                    const learningCount = new Set(
+                      sessionAttempts
+                        .filter((attempt) => attempt.phase === "learning")
+                        .map((attempt) => attempt.question_key),
+                    ).size;
+                    const preStatus = getPhaseGradeStatus(sessionAttempts, "pretest");
+                    const postStatus = getPhaseGradeStatus(
+                      sessionAttempts,
+                      "posttest",
+                    );
+                    return (
+                      <tr
+                        key={session.id}
+                        className="border-t border-slate-100 hover:bg-slate-50/60"
+                      >
+                        <td className="py-2 pr-4">
+                          <span
+                            className={cn(
+                              "px-2 py-1 rounded-full text-xs font-semibold",
+                              (session.app_env || "").toLowerCase() === "production"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-700",
+                            )}
+                          >
+                            {(session.app_env || "unknown").toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4 font-mono text-xs">
+                          {session.student_username || "-"}
+                        </td>
+                        <td className="py-2 pr-4 font-mono text-xs">{session.id}</td>
+                        <td className="py-2 pr-4">
+                          {Math.min(learningCount, totalLearningSteps)}/
+                          {totalLearningSteps}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span
+                            className={cn(
+                              "px-2 py-1 rounded-full text-xs font-semibold",
+                              getStatusBadgeClass(preStatus),
+                            )}
+                          >
+                            {preStatus}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span
+                            className={cn(
+                              "px-2 py-1 rounded-full text-xs font-semibold",
+                              getStatusBadgeClass(postStatus),
+                            )}
+                          >
+                            {postStatus}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4 capitalize">
+                          {session.flow_stage || "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {adminGradeConfirmOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+              <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-xl p-6 space-y-4">
+                <h3 className="text-xl font-semibold text-slate-900">
+                  Confirm Grading
+                </h3>
+                <p className="text-slate-600">
+                  This will grade all currently pending pre/post attempts in the
+                  selected environment. Continue?
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdminGradeConfirmOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold transition-all hover:bg-slate-100 hover:border-slate-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setAdminGradeConfirmOpen(false);
+                      await handleRunAdminGrading();
+                    }}
+                    className="px-4 py-2 rounded-xl gradient-bg text-white font-semibold shadow-md shadow-brand-pink/20 transition-all hover:brightness-110 hover:shadow-lg"
+                  >
+                    Yes, Grade Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -2181,7 +2428,7 @@ export default function App() {
                                               log.id,
                                             );
                                           }}
-                                          className="absolute right-3 bottom-3 p-4 gradient-text"
+                                          className="absolute right-4 bottom-14 inline-flex items-center justify-center text-brand-pink transition-all hover:scale-110"
                                           aria-label="Submit prompt"
                                         >
                                           <Send className="w-6 h-6" />

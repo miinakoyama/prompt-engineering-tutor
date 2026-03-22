@@ -4,7 +4,7 @@ import {
   parseGradingResponse,
   type FeedbackScore,
   type Rubric,
-} from "./_lib/gemini";
+} from "./_lib/gemini.js";
 import {
   handleOptions,
   isBadRequestError,
@@ -12,7 +12,7 @@ import {
   sendMethodNotAllowed,
   type ApiRequest,
   type ApiResponse,
-} from "./_lib/http";
+} from "./_lib/http.js";
 
 type PromptModeBody = {
   mode: "prompt";

@@ -5,8 +5,8 @@ import {
   sendMethodNotAllowed,
   type ApiRequest,
   type ApiResponse,
-} from "../_lib/http";
-import { supabaseAdmin } from "../_lib/supabase";
+} from "../_lib/http.js";
+import { supabaseAdmin } from "../_lib/supabase.js";
 
 type ExportRequestBody = {
   passcode?: string;

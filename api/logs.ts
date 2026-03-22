@@ -1,13 +1,13 @@
-import { handleOptions, parseJsonBody, sendMethodNotAllowed } from "./_lib/http";
+import {
+  handleOptions,
+  isBadRequestError,
+  parseJsonBody,
+  sendMethodNotAllowed,
+  type ApiRequest,
+  type ApiResponse,
+} from "./_lib/http";
 import { supabaseAdmin } from "./_lib/supabase";
 import { getAppEnv } from "./_lib/appEnv";
-
-type ApiRequest = { method?: string; body?: unknown };
-type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (payload: unknown) => void;
-  setHeader: (name: string, value: string) => void;
-};
 
 type EventLogBody = {
   sessionId?: string;
@@ -54,6 +54,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     res.status(200).json({ ok: true });
   } catch (error) {
+    if (isBadRequestError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     res.status(500).json({ error: String(error) });
   }
 }

@@ -5,14 +5,14 @@ import {
   type FeedbackScore,
   type Rubric,
 } from "./_lib/gemini";
-import { handleOptions, parseJsonBody, sendMethodNotAllowed } from "./_lib/http";
-
-type ApiRequest = { method?: string; body?: unknown };
-type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (payload: unknown) => void;
-  setHeader: (name: string, value: string) => void;
-};
+import {
+  handleOptions,
+  isBadRequestError,
+  parseJsonBody,
+  sendMethodNotAllowed,
+  type ApiRequest,
+  type ApiResponse,
+} from "./_lib/http";
 
 type PromptModeBody = {
   mode: "prompt";
@@ -170,6 +170,10 @@ ${formatScoreTemplate(body.rubric)}
         "Good effort! Try adding more specific details to make your prompt clearer.",
     });
   } catch (error) {
+    if (isBadRequestError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     res.status(500).json({ error: String(error) });
   }
 }

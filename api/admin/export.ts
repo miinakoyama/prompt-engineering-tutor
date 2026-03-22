@@ -1,27 +1,19 @@
-import { handleOptions, sendMethodNotAllowed } from "../_lib/http";
+import {
+  handleOptions,
+  isBadRequestError,
+  parseJsonBody,
+  sendMethodNotAllowed,
+  type ApiRequest,
+  type ApiResponse,
+} from "../_lib/http";
 import { supabaseAdmin } from "../_lib/supabase";
 
-type ApiRequest = {
-  method?: string;
-  query?: Record<string, string | string[]>;
+type ExportRequestBody = {
+  passcode?: string;
+  format?: "json" | "csv";
+  appEnv?: "local" | "production";
+  limit?: number;
 };
-type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (payload: unknown) => void;
-  setHeader: (name: string, value: string) => void;
-  send?: (body: string) => void;
-};
-
-function getQueryValue(
-  query: Record<string, string | string[]> | undefined,
-  key: string,
-) {
-  const value = query?.[key];
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-  return value;
-}
 
 function toCsvValue(value: unknown) {
   if (value === null || value === undefined) {
@@ -118,7 +110,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (handleOptions(req, res)) {
     return;
   }
-  if (req.method !== "GET") {
+  if (req.method !== "POST") {
     sendMethodNotAllowed(res);
     return;
   }
@@ -129,24 +121,55 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return;
   }
 
-  const passcode = getQueryValue(req.query, "passcode");
-  const format = (getQueryValue(req.query, "format") || "json").toLowerCase();
-  const appEnv = (getQueryValue(req.query, "appEnv") || "").toLowerCase();
+  let body: ExportRequestBody;
+  try {
+    body = parseJsonBody<ExportRequestBody>(req.body);
+  } catch (error) {
+    if (isBadRequestError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    res.status(500).json({ error: String(error) });
+    return;
+  }
+
+  const passcode = body.passcode;
+  const format = (body.format || "json").toLowerCase();
+  const appEnv = (body.appEnv || "").toLowerCase();
+  const limit = Math.max(100, Math.min(body.limit || 3000, 10000));
   if (!passcode || passcode !== configuredPasscode) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
   try {
-    const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }, { data: criteria, error: criteriaError }] =
+    const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }] =
       await Promise.all([
-        supabaseAdmin.from("sessions").select("*").order("started_at", { ascending: false }),
-        supabaseAdmin.from("attempts").select("*").order("submitted_at", { ascending: false }),
-        supabaseAdmin.from("criterion_scores").select("*"),
+        supabaseAdmin
+          .from("sessions")
+          .select(
+            "id,app_env,student_username,background,flow_stage,pretest_experience_level,pretest_confidence,posttest_confidence,started_at,pretest_completed_at,posttest_completed_at,completed_at,pretest_duration_sec,posttest_duration_sec,course_duration_sec",
+          )
+          .order("started_at", { ascending: false })
+          .limit(limit),
+        supabaseAdmin
+          .from("attempts")
+          .select(
+            "id,app_env,session_id,phase,question_key,question_title,prompt_raw,submitted_answer_raw,selected_choice,selected_method,selected_rationale,feedback_text,grading_status,score_total,score_max,submitted_at,graded_at,duration_sec",
+          )
+          .order("submitted_at", { ascending: false })
+          .limit(limit * 4),
       ]);
 
     if (sessionsError) throw sessionsError;
     if (attemptsError) throw attemptsError;
+    const attemptIds = (attempts || []).map((attempt) => attempt.id);
+    const { data: criteria, error: criteriaError } = attemptIds.length
+      ? await supabaseAdmin
+          .from("criterion_scores")
+          .select("attempt_id,criterion_id,criterion_label,score,reason")
+          .in("attempt_id", attemptIds)
+      : { data: [], error: null };
     if (criteriaError) throw criteriaError;
 
     const shouldFilterByEnv = appEnv === "local" || appEnv === "production";
@@ -304,11 +327,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       ok: true,
       exportedAt: new Date().toISOString(),
       appEnv: shouldFilterByEnv ? appEnv : "all",
+      limit,
       sessions: filteredSessions,
       attempts: filteredAttempts,
       criterionScores: filteredCriteria,
     });
   } catch (error) {
+    if (isBadRequestError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     res.status(500).json({ error: String(error) });
   }
 }

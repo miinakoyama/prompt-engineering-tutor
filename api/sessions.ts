@@ -1,13 +1,14 @@
-import { handleOptions, parseJsonBody, sendMethodNotAllowed } from "./_lib/http";
+import {
+  BadRequestError,
+  handleOptions,
+  isBadRequestError,
+  parseJsonBody,
+  sendMethodNotAllowed,
+  type ApiRequest,
+  type ApiResponse,
+} from "./_lib/http";
 import { supabaseAdmin } from "./_lib/supabase";
 import { getAppEnv } from "./_lib/appEnv";
-
-type ApiRequest = { method?: string; body?: unknown };
-type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (payload: unknown) => void;
-  setHeader: (name: string, value: string) => void;
-};
 
 type CreateSessionBody = {
   username: string;
@@ -37,6 +38,31 @@ type UpdateSessionBody = {
 function normalizeUsername(username: string) {
   return username.trim().toLowerCase();
 }
+const USERNAME_PATTERN = /^[a-z0-9]{2,16}$/;
+
+function toIsoStringFromMs(value: number, fieldName: string) {
+  if (!Number.isFinite(value)) {
+    throw new BadRequestError(`${fieldName} must be a finite number`);
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestError(`${fieldName} is invalid`);
+  }
+  return date.toISOString();
+}
+
+function toOptionalIsoStringFromMs(
+  value: number | null | undefined,
+  fieldName: string,
+) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  return toIsoStringFromMs(value, fieldName);
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const appEnv = getAppEnv();
@@ -48,8 +74,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === "POST") {
       const body = parseJsonBody<CreateSessionBody>(req.body);
       const username = normalizeUsername(body.username || "");
-      if (!username) {
-        res.status(400).json({ error: "username is required" });
+      if (!username || !USERNAME_PATTERN.test(username)) {
+        res.status(400).json({
+          error:
+            "username must be 2-16 characters and include only lowercase letters and numbers",
+        });
         return;
       }
 
@@ -70,7 +99,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         background: body.background || null,
         pretest_experience_level: body.pretestExperienceLevel || null,
         pretest_confidence: body.pretestConfidence || null,
-        started_at: body.startedAt ? new Date(body.startedAt).toISOString() : new Date().toISOString(),
+        started_at:
+          body.startedAt !== undefined
+            ? toIsoStringFromMs(body.startedAt, "startedAt")
+            : new Date().toISOString(),
       };
 
       const { data: session, error: sessionError } = await supabaseAdmin
@@ -100,11 +132,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (body.pretestExperienceLevel !== undefined) payload.pretest_experience_level = body.pretestExperienceLevel;
       if (body.pretestConfidence !== undefined) payload.pretest_confidence = body.pretestConfidence;
       if (body.posttestConfidence !== undefined) payload.posttest_confidence = body.posttestConfidence;
-      if (body.learningStartedAt !== undefined) payload.learning_started_at = body.learningStartedAt ? new Date(body.learningStartedAt).toISOString() : null;
-      if (body.posttestStartedAt !== undefined) payload.posttest_started_at = body.posttestStartedAt ? new Date(body.posttestStartedAt).toISOString() : null;
-      if (body.pretestCompletedAt !== undefined) payload.pretest_completed_at = body.pretestCompletedAt ? new Date(body.pretestCompletedAt).toISOString() : null;
-      if (body.posttestCompletedAt !== undefined) payload.posttest_completed_at = body.posttestCompletedAt ? new Date(body.posttestCompletedAt).toISOString() : null;
-      if (body.completedAt !== undefined) payload.completed_at = body.completedAt ? new Date(body.completedAt).toISOString() : null;
+      if (body.learningStartedAt !== undefined) payload.learning_started_at = toOptionalIsoStringFromMs(body.learningStartedAt, "learningStartedAt");
+      if (body.posttestStartedAt !== undefined) payload.posttest_started_at = toOptionalIsoStringFromMs(body.posttestStartedAt, "posttestStartedAt");
+      if (body.pretestCompletedAt !== undefined) payload.pretest_completed_at = toOptionalIsoStringFromMs(body.pretestCompletedAt, "pretestCompletedAt");
+      if (body.posttestCompletedAt !== undefined) payload.posttest_completed_at = toOptionalIsoStringFromMs(body.posttestCompletedAt, "posttestCompletedAt");
+      if (body.completedAt !== undefined) payload.completed_at = toOptionalIsoStringFromMs(body.completedAt, "completedAt");
       if (body.pretestDurationSec !== undefined) payload.pretest_duration_sec = body.pretestDurationSec;
       if (body.posttestDurationSec !== undefined) payload.posttest_duration_sec = body.posttestDurationSec;
       if (body.courseDurationSec !== undefined) payload.course_duration_sec = body.courseDurationSec;
@@ -119,6 +151,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     sendMethodNotAllowed(res);
   } catch (error) {
+    if (isBadRequestError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     res.status(500).json({ error: String(error) });
   }
 }

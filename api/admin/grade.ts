@@ -5,17 +5,17 @@ import {
   type FeedbackScore,
   type Rubric,
 } from "../_lib/gemini";
-import { handleOptions, parseJsonBody, sendMethodNotAllowed } from "../_lib/http";
+import {
+  handleOptions,
+  isBadRequestError,
+  parseJsonBody,
+  sendMethodNotAllowed,
+  type ApiRequest,
+  type ApiResponse,
+} from "../_lib/http";
 import { supabaseAdmin } from "../_lib/supabase";
 import { METHOD_RATIONALE_RUBRIC, POST_TEST_TASKS, PRE_TEST_TASKS } from "../../src/constants";
 import type { AssessmentTask } from "../../src/types";
-
-type ApiRequest = { method?: string; body?: unknown };
-type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (payload: unknown) => void;
-  setHeader: (name: string, value: string) => void;
-};
 
 type GradeRequestBody = {
   passcode?: string;
@@ -304,6 +304,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       failedAttemptIds,
     });
   } catch (error) {
+    if (isBadRequestError(error)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     res.status(500).json({ error: String(error) });
   }
 }

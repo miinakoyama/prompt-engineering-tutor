@@ -37,6 +37,9 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import ReactMarkdown from "react-markdown";
 import {
+  type AdminAttemptRow,
+  type AdminDataResponse,
+  type AdminSessionRow,
   createSession,
   fetchAdminData,
   fetchAdminExport,
@@ -216,6 +219,7 @@ export default function App() {
   const [preConfidence, setPreConfidence] = useState("");
   const [postConfidence, setPostConfidence] = useState("");
   const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
+  const [assessmentSubmitError, setAssessmentSubmitError] = useState("");
   const [studentUsername, setStudentUsername] = useState("");
   const [usernameInput, setUsernameInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -231,7 +235,7 @@ export default function App() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [adminPasscode, setAdminPasscode] = useState("");
   const [adminAuthorized, setAdminAuthorized] = useState(false);
-  const [adminData, setAdminData] = useState<any | null>(null);
+  const [adminData, setAdminData] = useState<AdminDataResponse | null>(null);
   const [adminError, setAdminError] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminGrading, setAdminGrading] = useState(false);
@@ -345,6 +349,9 @@ export default function App() {
     taskId: AssessmentTaskId,
     patch: Partial<AssessmentAnswer>,
   ) => {
+    if (assessmentSubmitError) {
+      setAssessmentSubmitError("");
+    }
     const questionKey = `${phase}-${taskId}`;
     setQuestionStartedAt((prev) =>
       prev[questionKey] ? prev : { ...prev, [questionKey]: Date.now() },
@@ -946,6 +953,7 @@ export default function App() {
     });
 
     setIsSubmittingAssessment(true);
+    setAssessmentSubmitError("");
     try {
       await submitAssessment({
         sessionId,
@@ -977,7 +985,7 @@ export default function App() {
       setFlowStage("learning");
     } catch (error) {
       console.error("Failed to submit pretest", error);
-      setUsernameError("Failed to submit pre-test. Please try again.");
+      setAssessmentSubmitError("Failed to submit pre-test. Please try again.");
     } finally {
       setIsSubmittingAssessment(false);
     }
@@ -994,6 +1002,7 @@ export default function App() {
     }
 
     setIsSubmittingAssessment(true);
+    setAssessmentSubmitError("");
     try {
       const submittedAt = Date.now();
       const postDuration = posttestStartedAt
@@ -1039,10 +1048,7 @@ export default function App() {
       setFlowStage("done");
     } catch (error) {
       console.error("Assessment submit error:", error);
-      addLog({
-        type: "intro",
-        content: "Failed to submit assessment data. Please try again.",
-      });
+      setAssessmentSubmitError("Failed to submit assessment data. Please try again.");
     } finally {
       setIsSubmittingAssessment(false);
     }
@@ -1387,7 +1393,10 @@ export default function App() {
               </section>
             ))}
 
-            <div className="pt-2">
+            <div className="pt-2 space-y-3">
+              {assessmentSubmitError ? (
+                <p className="text-sm text-red-600">{assessmentSubmitError}</p>
+              ) : null}
               <button
                 type="button"
                 onClick={submitAction}
@@ -1516,22 +1525,24 @@ export default function App() {
     const filteredAttempts = attempts.filter(matchesEnvFilter);
     const uniqueUsers = new Set(
       filteredSessions
-        .map((session: any) => (session.student_username || "").trim().toLowerCase())
+        .map((session: AdminSessionRow) =>
+          (session.student_username || "").trim().toLowerCase(),
+        )
         .filter(Boolean),
     ).size;
     const attemptsBySessionId = filteredAttempts.reduce(
-      (acc: Record<string, any[]>, attempt: any) => {
+      (acc: Record<string, AdminAttemptRow[]>, attempt: AdminAttemptRow) => {
         if (!acc[attempt.session_id]) {
           acc[attempt.session_id] = [];
         }
         acc[attempt.session_id].push(attempt);
         return acc;
       },
-      {},
+      {} as Record<string, AdminAttemptRow[]>,
     );
     const totalLearningSteps = MODULES.length * 2;
     const getPhaseGradeStatus = (
-      attemptsForSession: any[],
+      attemptsForSession: AdminAttemptRow[],
       phase: "pretest" | "posttest",
     ) => {
       const phaseAttempts = attemptsForSession.filter(
@@ -1764,7 +1775,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSessions.map((session: any) => {
+                  {filteredSessions.map((session: AdminSessionRow) => {
                     const sessionAttempts = attemptsBySessionId[session.id] || [];
                     const learningCount = new Set(
                       sessionAttempts

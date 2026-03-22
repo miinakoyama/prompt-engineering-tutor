@@ -89,8 +89,9 @@ export function extractFeedbackText(response: string) {
   try {
     const parsed = extractJsonObject(response);
     return String(parsed.feedback || "");
-  } catch {
-    return "";
+  } catch (error) {
+    console.error("Failed to parse feedback JSON from model response", error);
+    return null;
   }
 }
 

@@ -1,5 +1,40 @@
 import type { FeedbackScore } from "../types";
 
+export type AdminSessionRow = {
+  id: string;
+  app_env: string | null;
+  student_username: string | null;
+  flow_stage: string | null;
+  started_at: string;
+};
+
+export type AdminAttemptRow = {
+  id: string;
+  app_env: string | null;
+  session_id: string;
+  phase: "pretest" | "learning" | "posttest";
+  question_key: string;
+  grading_status: "pending" | "graded" | "failed";
+  submitted_at: string;
+};
+
+export type AdminCriterionScoreRow = {
+  id: number;
+  attempt_id: string;
+  criterion_id: string;
+  criterion_label: string;
+  score: number;
+  reason: string | null;
+};
+
+export type AdminDataResponse = {
+  ok: true;
+  sessions: AdminSessionRow[];
+  attempts: AdminAttemptRow[];
+  pendingAttempts: AdminAttemptRow[];
+  pendingAttemptCriterionScores: AdminCriterionScoreRow[];
+};
+
 type LogEventInput = {
   sessionId?: string;
   eventType: string;
@@ -168,7 +203,7 @@ export async function fetchAdminData(passcode: string, limit = 100) {
     const text = await response.text();
     throw new Error(`Request failed: ${response.status} ${text}`);
   }
-  return response.json();
+  return response.json() as Promise<AdminDataResponse>;
 }
 
 export function runAdminGrading(
@@ -192,14 +227,15 @@ export async function fetchAdminExport(
   format: "json" | "csv",
   appEnv?: "all" | "local" | "production",
 ) {
-  const searchParams = new URLSearchParams({
-    passcode,
-    format,
+  const response = await fetch("/api/admin/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      passcode,
+      format,
+      appEnv: appEnv && appEnv !== "all" ? appEnv : undefined,
+    }),
   });
-  if (appEnv && appEnv !== "all") {
-    searchParams.set("appEnv", appEnv);
-  }
-  const response = await fetch(`/api/admin/export?${searchParams.toString()}`);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Request failed: ${response.status} ${text}`);

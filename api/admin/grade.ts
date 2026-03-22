@@ -4,7 +4,7 @@ import {
   parseGradingResponse,
   type FeedbackScore,
   type Rubric,
-} from "../_lib/gemini";
+} from "../_lib/gemini.js";
 import {
   handleOptions,
   isBadRequestError,
@@ -12,10 +12,10 @@ import {
   sendMethodNotAllowed,
   type ApiRequest,
   type ApiResponse,
-} from "../_lib/http";
-import { supabaseAdmin } from "../_lib/supabase";
-import { METHOD_RATIONALE_RUBRIC, POST_TEST_TASKS, PRE_TEST_TASKS } from "../../src/constants";
-import type { AssessmentTask } from "../../src/types";
+} from "../_lib/http.js";
+import { supabaseAdmin } from "../_lib/supabase.js";
+import { METHOD_RATIONALE_RUBRIC, POST_TEST_TASKS, PRE_TEST_TASKS } from "../../src/constants.js";
+import type { AssessmentTask } from "../../src/types.js";
 
 type GradeRequestBody = {
   passcode?: string;

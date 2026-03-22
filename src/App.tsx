@@ -1441,7 +1441,19 @@ export default function App() {
         );
       }
     } catch (error) {
-      setAdminError("Failed to load admin data. Check your passcode.");
+      const detail =
+        error instanceof Error && error.message
+          ? error.message.replace(/^Request failed:\s*/i, "").trim()
+          : "";
+      const isUnauthorized =
+        /(^|\s)401(\s|$)/.test(detail) || /unauthorized/i.test(detail);
+      setAdminError(
+        isUnauthorized
+          ? "Failed to load admin data. Check your passcode."
+          : detail
+            ? `Failed to load admin data. ${detail}`
+            : "Failed to load admin data.",
+      );
       setAdminAuthorized(false);
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem("promptMentorAdminPasscode");

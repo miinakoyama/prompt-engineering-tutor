@@ -6,9 +6,9 @@ import {
   sendMethodNotAllowed,
   type ApiRequest,
   type ApiResponse,
-} from "./_lib/http";
-import { supabaseAdmin } from "./_lib/supabase";
-import { getAppEnv } from "./_lib/appEnv";
+} from "./_lib/http.js";
+import { supabaseAdmin } from "./_lib/supabase.js";
+import { getAppEnv } from "./_lib/appEnv.js";
 
 type CreateSessionBody = {
   username: string;

@@ -105,6 +105,8 @@ export interface AssessmentTask {
   technique: Technique | 'Method Selection';
   scenario: string;
   requirement: string;
+  choices?: { id: string; text: string }[];
+  correctChoiceId?: string;
   referencePrompt: string;
   referenceMethod?: PromptingMethod;
   referenceRationale?: string;
@@ -114,6 +116,7 @@ export interface AssessmentTask {
 
 export interface AssessmentAnswer {
   prompt: string;
+  selectedChoice?: string;
   method?: PromptingMethod;
   rationale?: string;
 }

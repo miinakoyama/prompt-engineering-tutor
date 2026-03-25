@@ -11,6 +11,7 @@ import { getAppEnv } from "./_lib/appEnv.js";
 
 type AssessmentAnswer = {
   prompt: string;
+  selectedChoice?: string;
   method?: string;
   rationale?: string;
 };
@@ -55,11 +56,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       phase: body.phase === "pre" ? "pretest" : "posttest",
       question_key: `${body.phase}-task-${taskId}`,
       question_title: `${body.phase.toUpperCase()} task ${taskId}`,
-      prompt_raw: answer.prompt || "",
+      prompt_raw: answer.prompt?.trim() ? answer.prompt : null,
+      selected_choice: answer.selectedChoice || null,
       selected_method: answer.method || null,
       selected_rationale: answer.rationale || null,
       grading_status: "pending",
-      score_max: 4,
+      score_max: answer.selectedChoice ? 1 : 4,
       submitted_at: submittedAtIso,
       duration_sec: body.questionDurationsSec?.[taskId] ?? body.durationSec ?? null,
       metadata: {

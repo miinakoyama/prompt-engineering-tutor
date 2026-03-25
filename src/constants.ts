@@ -139,9 +139,28 @@ export const PRE_TEST_TASKS: AssessmentTask[] = [
     scenario:
       'You have customer reviews for a new cafe. You want the AI to label each review as "Happy," "Neutral," or "Angry."',
     requirement:
-      'Write a one-sentence prompt that asks the AI to classify the sentiment of this review: "The coffee was lukewarm, but the staff was incredibly friendly and offered a refund."',
+      'Which of the following is the most effective one-sentence zero-shot prompt to classify the sentiment of the review: "The coffee was lukewarm, but the staff was incredibly friendly and offered a refund"?',
+    choices: [
+      {
+        id: "A",
+        text: 'Read this review and tell me if the customer liked the coffee or the staff more.',
+      },
+      {
+        id: "B",
+        text: 'Classify the sentiment of the following review as "Happy," "Neutral," or "Angry": "The coffee was lukewarm, but the staff was incredibly friendly and offered a refund."',
+      },
+      {
+        id: "C",
+        text: "Here are some examples of happy and angry reviews; please use them to label this specific text about a cafe.",
+      },
+      {
+        id: "D",
+        text: "Explain why a customer might feel neutral about receiving a refund for lukewarm coffee.",
+      },
+    ],
+    correctChoiceId: "B",
     referencePrompt:
-      'Classify the sentiment of the following customer review as "Happy," "Neutral," or "Angry," and respond with only one of these labels and no additional explanation: "The coffee was lukewarm, but the staff was incredibly friendly and offered a refund."',
+      'Classify the sentiment of the following review as "Happy," "Neutral," or "Angry": "The coffee was lukewarm, but the staff was incredibly friendly and offered a refund."',
     rubric: ZERO_SHOT_RUBRIC,
   },
   {
@@ -151,9 +170,28 @@ export const PRE_TEST_TASKS: AssessmentTask[] = [
     scenario:
       'You want the AI to change project names into a code-friendly format by replacing spaces with underscores (e.g., "Project Delta" -> "Project_Delta").',
     requirement:
-      'Write a prompt that includes two examples to show the AI how this formatting works, and then asks it to format this new input: "Upgrade Server Alpha".',
+      'To ensure an AI correctly formats "Upgrade Server Alpha" into a code-friendly version (replacing spaces with underscores), which few-shot prompt should you use?',
+    choices: [
+      {
+        id: "A",
+        text: "Please replace all the spaces in the string 'Upgrade Server Alpha' with underscores.",
+      },
+      {
+        id: "B",
+        text: "Format this text like a variable name: Upgrade Server Alpha.",
+      },
+      {
+        id: "C",
+        text: "Project Delta -> Project_Delta; System Update -> System_Update; Upgrade Server Alpha ->",
+      },
+      {
+        id: "D",
+        text: "Change 'Project Delta' to 'Project_Delta' and then do the same for 'Upgrade Server Alpha'.",
+      },
+    ],
+    correctChoiceId: "C",
     referencePrompt:
-      "Convert the following project names into a code-friendly format by replacing all spaces with underscores. Do not include any additional text or explanation.\nInput: Project Delta\nOutput: Project_Delta\nInput: Client Report Summary\nOutput: Client_Report_Summary\nInput: Upgrade Server Alpha\nOutput:",
+      "Project Delta -> Project_Delta; System Update -> System_Update; Upgrade Server Alpha ->",
     rubric: FEW_SHOT_RUBRIC,
   },
   {
@@ -163,9 +201,28 @@ export const PRE_TEST_TASKS: AssessmentTask[] = [
     scenario:
       "A library starts with 500 books. On Monday, 50 books are checked out. On Tuesday, 20 books are returned, but 10 books are lost. On Wednesday, the library gets 30 new books as a donation.",
     requirement:
-      "Write a prompt that tells the AI to figure out the final number of books and explain the calculation step by step.",
+      "A library starts with 500 books. On Monday, 50 are checked out. On Tuesday, 20 are returned but 10 are lost. On Wednesday, 30 new books are donated. Which prompt best utilizes Chain-of-Thought to find the final total?",
+    choices: [
+      {
+        id: "A",
+        text: "How many books are in the library now? Give me the final number only.",
+      },
+      {
+        id: "B",
+        text: "Calculate the total number of books after the changes on Monday, Tuesday, and Wednesday.",
+      },
+      {
+        id: "C",
+        text: "A library has 500 books. After various check-outs and donations, what is the final count? Work through the math step-by-step to find the answer.",
+      },
+      {
+        id: "D",
+        text: "Is the final number of books 490? Answer yes or no.",
+      },
+    ],
+    correctChoiceId: "C",
     referencePrompt:
-      "A library starts with 500 books. On Monday, 50 books are checked out. On Tuesday, 20 books are returned, but 10 books are lost. On Wednesday, the library receives 30 new books as a donation. Please calculate the final number of books and explain your reasoning step by step.",
+      "A library has 500 books. After various check-outs and donations, what is the final count? Work through the math step-by-step to find the answer.",
     rubric: COT_RUBRIC,
   },
   {
@@ -194,7 +251,26 @@ export const POST_TEST_TASKS: AssessmentTask[] = [
     scenario:
       'You are a social media manager. You need to turn a technical 3-page research paper about "Solar Flare Impact on GPS" into a catchy tweet for teenagers.',
     requirement:
-      "Write a zero-shot prompt that defines a specific persona and audience to generate this tweet.",
+      'You need to turn a 3-page research paper about "Solar Flare Impact on GPS" into a catchy tweet for teenagers. Which of the following prompts correctly defines the persona, audience, and specific constraints required for this zero-shot task?',
+    choices: [
+      {
+        id: "A",
+        text: "Summarize the solar flare research paper as a tweet for teenagers and make sure it's catchy.",
+      },
+      {
+        id: "B",
+        text: "Act as a Social Media Manager for a tech news outlet. Summarize the 'Solar Flare Impact on GPS' paper for teenagers (13-19). Use an energetic tone, a single tweet format, no words over 4 syllables, exactly 2 hashtags, and mention phone navigation apps.",
+      },
+      {
+        id: "C",
+        text: "Write a tweet about how solar flares affect GPS. Use simple words so that a teenager can understand it, and include a few hashtags about technology.",
+      },
+      {
+        id: "D",
+        text: "Explain the impact of solar flares on GPS to a young audience. Compare the scientific data to how Google Maps works on a smartphone.",
+      },
+    ],
+    correctChoiceId: "B",
     referencePrompt:
       "Act as a Social Media Manager for a tech news outlet. Your goal is to summarize the 'Solar Flare Impact on GPS' paper for an audience of teenagers (Ages 13-19). Use an energetic and relatable tone. Format the output as a single tweet. Constraints: Do not use words with more than 4 syllables, use exactly 2 hashtags, and include a reference to how this affects their phone's navigation apps (like Google Maps).",
     rubric: ZERO_SHOT_RUBRIC,
@@ -206,7 +282,26 @@ export const POST_TEST_TASKS: AssessmentTask[] = [
     scenario:
       "You are building an app that requires AI responses to be in valid JSON format.",
     requirement:
-      'Write a prompt using two examples that ensures the AI always returns data with the keys "summary" and "word_count". The target input is a paragraph about the Great Wall of China.',
+      'To ensure an AI consistently converts text into a valid JSON object with the keys "summary" and "word_count", which few-shot prompt structure is most effective?',
+    choices: [
+      {
+        id: "A",
+        text: "Convert this text into JSON: 'The Great Wall of China is a series of fortifications...' Use the keys 'summary' and 'word_count'.",
+      },
+      {
+        id: "B",
+        text: 'I need a JSON output. Here is an example: {"fruit": "apple", "color": "red"}. Now do the same for the Great Wall of China.',
+      },
+      {
+        id: "C",
+        text: "Provide a summary and word count for the Great Wall of China. Ensure the output looks like a dictionary in Python.",
+      },
+      {
+        id: "D",
+        text: 'Input: The Eiffel Tower is a famous landmark... Output: {"summary": "A famous landmark...", "word_count": 7} | Input: The Amazon Rainforest... Output: {"summary": "The world\'s largest...", "word_count": 6} | Input: The Great Wall of China... Output:',
+      },
+    ],
+    correctChoiceId: "D",
     referencePrompt:
       'Convert the following text into a JSON object with the keys "summary" and "word_count". Only return valid JSON and no conversational text.\nInput: The Eiffel Tower is a famous landmark in Paris.\nOutput: {"summary": "A famous landmark in Paris.", "word_count": 7}\nInput: The Amazon Rainforest is the world\'s largest tropical rainforest.\nOutput: {"summary": "The world\'s largest tropical rainforest.", "word_count": 6}\nInput: The Great Wall of China is a series of fortifications that were built across the historical northern borders of ancient Chinese states.\nOutput:',
     rubric: FEW_SHOT_RUBRIC,
@@ -218,7 +313,26 @@ export const POST_TEST_TASKS: AssessmentTask[] = [
     scenario:
       "A self-driving car must choose between two actions: hitting a stray dog, or swerving into a ditch, which may damage the car's expensive sensors. No humans are at risk, but both options have negative consequences.",
     requirement:
-      "Write a prompt that instructs the AI to analyze both options step by step using a safety-first approach, compare the risks of each option, and make a final decision.",
+      "A self-driving car must choose between hitting a dog or swerving into a ditch (damaging sensors). Which prompt correctly implements a Chain-of-Thought approach using a safety-first framework?",
+    choices: [
+      {
+        id: "A",
+        text: "What should a self-driving car do if it has to choose between hitting a dog or damaging its sensors? Choose the safest option.",
+      },
+      {
+        id: "B",
+        text: "Analyze the choice between hitting a dog or damaging sensors step by step: First, consider the harm to the dog; second, analyze long-term safety risks of damaged sensors; third, compare both via a safety-first approach; finally, state the best action.",
+      },
+      {
+        id: "C",
+        text: "Think step-by-step: Is it better to save a dog's life or save expensive technology? Provide a logical argument for your final decision.",
+      },
+      {
+        id: "D",
+        text: "Compare the cost of a stray dog's life versus the cost of expensive car sensors. Which is more important in a safety-first framework?",
+      },
+    ],
+    correctChoiceId: "B",
     referencePrompt:
       "A self-driving car must choose between hitting a stray dog or swerving into a ditch, which may damage its sensors. No humans are at risk. Using a safety-first framework, think step by step and show your reasoning before giving a final answer. First, consider the harm to the dog. Second, analyze the risks and long-term safety consequences of damaging the sensors. Third, compare both options based on a safety-first approach. Finally, state the best course of action and explain your reasoning.",
     rubric: COT_RUBRIC,

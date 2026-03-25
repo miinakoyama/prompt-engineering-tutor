@@ -123,9 +123,9 @@ const CONFIDENCE_OPTIONS = [
 
 function createEmptyAssessmentAnswers(): AssessmentAnswers {
   return {
-    1: { prompt: "" },
-    2: { prompt: "" },
-    3: { prompt: "" },
+    1: { prompt: "", selectedChoice: undefined },
+    2: { prompt: "", selectedChoice: undefined },
+    3: { prompt: "", selectedChoice: undefined },
     4: { prompt: "", method: undefined, rationale: "" },
   };
 }
@@ -327,6 +327,10 @@ export default function App() {
   ) => {
     return tasks.every((task) => {
       const answer = answers[task.id];
+      const isMcqTask = Boolean(task.choices?.length);
+      if (isMcqTask) {
+        return Boolean(answer?.selectedChoice);
+      }
       if (!answer?.prompt.trim()) {
         return false;
       }
@@ -1376,19 +1380,57 @@ export default function App() {
                 )}
 
                 <div className="space-y-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                    Prompt
-                  </p>
-                  <textarea
-                    placeholder="Write your prompt..."
-                    value={answers[task.id].prompt}
-                    onChange={(event) =>
-                      updateAssessmentAnswer(phase, task.id, {
-                        prompt: event.target.value,
-                      })
-                    }
-                    className="w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
-                  />
+                  {task.choices?.length ? (
+                    <>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                        Select One
+                      </p>
+                      <div className="space-y-2">
+                        {task.choices.map((choice) => {
+                          const isSelected =
+                            answers[task.id].selectedChoice === choice.id;
+                          return (
+                            <button
+                              key={choice.id}
+                              type="button"
+                              onClick={() =>
+                                updateAssessmentAnswer(phase, task.id, {
+                                  selectedChoice: choice.id,
+                                })
+                              }
+                              className={cn(
+                                "w-full text-left border rounded-xl px-4 py-3 transition-colors",
+                                isSelected
+                                  ? "bg-brand-pink/10 border-brand-pink text-slate-900"
+                                  : "bg-white border-slate-200 text-slate-700 hover:border-slate-300",
+                              )}
+                            >
+                              <span className="font-semibold mr-2">
+                                {choice.id})
+                              </span>
+                              {choice.text}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                        Prompt
+                      </p>
+                      <textarea
+                        placeholder="Write your prompt..."
+                        value={answers[task.id].prompt}
+                        onChange={(event) =>
+                          updateAssessmentAnswer(phase, task.id, {
+                            prompt: event.target.value,
+                          })
+                        }
+                        className="w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[120px]"
+                      />
+                    </>
+                  )}
                 </div>
               </section>
             ))}
@@ -2351,7 +2393,18 @@ export default function App() {
                               {log.technique === "Technique Selection" &&
                                 log.level === 2 &&
                                 log.methodStepCompleted && (
-                                  <div className="p-5 rounded-xl border border-slate-200 bg-white space-y-4">
+                                  <div
+                                    className={cn(
+                                      "p-5 rounded-xl border space-y-4",
+                                      log.methodFeedbackScore?.grade === "green"
+                                        ? "bg-emerald-50 border-emerald-200"
+                                        : log.methodFeedbackScore?.grade === "yellow"
+                                          ? "bg-amber-50 border-amber-200"
+                                          : log.methodFeedbackScore?.grade === "red"
+                                            ? "bg-red-50 border-red-200"
+                                            : "bg-white border-slate-200",
+                                    )}
+                                  >
                                     <div className="flex items-center justify-between gap-3">
                                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                                         Method Feedback

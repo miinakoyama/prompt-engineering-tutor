@@ -94,7 +94,15 @@ type AttemptInput = {
 type AssessmentSubmitInput = {
   sessionId: string;
   phase: "pre" | "post";
-  answers: Record<string, { prompt: string; method?: string; rationale?: string }>;
+  answers: Record<
+    string,
+    {
+      prompt: string;
+      selectedChoice?: string;
+      method?: string;
+      rationale?: string;
+    }
+  >;
   survey?: {
     skillLevel?: string;
     confidence?: string;

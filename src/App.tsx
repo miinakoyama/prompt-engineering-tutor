@@ -50,6 +50,7 @@ import {
   submitAssessment,
   updateSession,
 } from "./lib/apiClient";
+import { isMcqAssessmentTask } from "./assessmentTasks";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -327,7 +328,7 @@ export default function App() {
   ) => {
     return tasks.every((task) => {
       const answer = answers[task.id];
-      const isMcqTask = Boolean(task.choices?.length);
+      const isMcqTask = isMcqAssessmentTask(task);
       if (isMcqTask) {
         return Boolean(answer?.selectedChoice);
       }
@@ -1380,39 +1381,51 @@ export default function App() {
                 )}
 
                 <div className="space-y-3">
-                  {task.choices?.length ? (
+                  {isMcqAssessmentTask(task) ? (
                     <>
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                         Select One
                       </p>
-                      <div className="space-y-2">
+                      <fieldset className="space-y-2">
                         {task.choices.map((choice) => {
+                          const inputId = `${phase}-task-${task.id}-choice-${choice.id}`;
+                          const inputName = `${phase}-task-${task.id}`;
                           const isSelected =
                             answers[task.id].selectedChoice === choice.id;
                           return (
-                            <button
+                            <label
                               key={choice.id}
-                              type="button"
-                              onClick={() =>
-                                updateAssessmentAnswer(phase, task.id, {
-                                  selectedChoice: choice.id,
-                                })
-                              }
+                              htmlFor={inputId}
                               className={cn(
-                                "w-full text-left border rounded-xl px-4 py-3 transition-colors",
+                                "w-full flex items-start gap-3 text-left border rounded-xl px-4 py-3 transition-colors cursor-pointer",
                                 isSelected
                                   ? "bg-brand-pink/10 border-brand-pink text-slate-900"
                                   : "bg-white border-slate-200 text-slate-700 hover:border-slate-300",
                               )}
                             >
-                              <span className="font-semibold mr-2">
-                                {choice.id})
+                              <input
+                                id={inputId}
+                                name={inputName}
+                                type="radio"
+                                value={choice.id}
+                                checked={isSelected}
+                                onChange={() =>
+                                  updateAssessmentAnswer(phase, task.id, {
+                                    selectedChoice: choice.id,
+                                  })
+                                }
+                                className="mt-1 h-4 w-4 text-brand-pink border-slate-300 focus:ring-brand-pink"
+                              />
+                              <span>
+                                <span className="font-semibold mr-2">
+                                  {choice.id})
+                                </span>
+                                {choice.text}
                               </span>
-                              {choice.text}
-                            </button>
+                            </label>
                           );
                         })}
-                      </div>
+                      </fieldset>
                     </>
                   ) : (
                     <>

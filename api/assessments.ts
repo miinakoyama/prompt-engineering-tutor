@@ -8,6 +8,8 @@ import {
 } from "./_lib/http.js";
 import { supabaseAdmin } from "./_lib/supabase.js";
 import { getAppEnv } from "./_lib/appEnv.js";
+import { POST_TEST_TASKS, PRE_TEST_TASKS } from "../src/constants.js";
+import { isMcqAssessmentTask } from "../src/assessmentTasks.js";
 
 type AssessmentAnswer = {
   prompt: string;
@@ -28,6 +30,15 @@ type AssessmentSubmissionBody = {
   submittedAt?: number;
   questionDurationsSec?: Record<string, number>;
 };
+
+function getAssessmentTask(phase: "pre" | "post", taskId: string) {
+  const parsedId = Number(taskId);
+  if (!Number.isFinite(parsedId)) {
+    return null;
+  }
+  const taskList = phase === "pre" ? PRE_TEST_TASKS : POST_TEST_TASKS;
+  return taskList.find((task) => task.id === parsedId) || null;
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const appEnv = getAppEnv();
@@ -50,25 +61,32 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const submittedAtIso = body.submittedAt
       ? new Date(body.submittedAt).toISOString()
       : new Date().toISOString();
-    const attemptRows = Object.entries(body.answers).map(([taskId, answer]) => ({
-      session_id: body.sessionId,
-      app_env: appEnv,
-      phase: body.phase === "pre" ? "pretest" : "posttest",
-      question_key: `${body.phase}-task-${taskId}`,
-      question_title: `${body.phase.toUpperCase()} task ${taskId}`,
-      prompt_raw: answer.prompt?.trim() ? answer.prompt : null,
-      selected_choice: answer.selectedChoice || null,
-      selected_method: answer.method || null,
-      selected_rationale: answer.rationale || null,
-      grading_status: "pending",
-      score_max: answer.selectedChoice ? 1 : 4,
-      submitted_at: submittedAtIso,
-      duration_sec: body.questionDurationsSec?.[taskId] ?? body.durationSec ?? null,
-      metadata: {
-        source: "assessment_submit",
-        phaseDurationSec: body.durationSec ?? null,
-      },
-    }));
+    const attemptRows = Object.entries(body.answers).map(([taskId, answer]) => {
+      const task = getAssessmentTask(body.phase, taskId);
+      if (!task) {
+        throw new Error(`Unknown task id: ${taskId}`);
+      }
+      const isMcqTask = isMcqAssessmentTask(task);
+      return {
+        session_id: body.sessionId,
+        app_env: appEnv,
+        phase: body.phase === "pre" ? "pretest" : "posttest",
+        question_key: `${body.phase}-task-${taskId}`,
+        question_title: `${body.phase.toUpperCase()} task ${taskId}`,
+        prompt_raw: isMcqTask ? null : answer.prompt?.trim() ? answer.prompt : null,
+        selected_choice: isMcqTask ? answer.selectedChoice || null : null,
+        selected_method: answer.method || null,
+        selected_rationale: answer.rationale || null,
+        grading_status: "pending",
+        score_max: isMcqTask ? 1 : 4,
+        submitted_at: submittedAtIso,
+        duration_sec: body.questionDurationsSec?.[taskId] ?? body.durationSec ?? null,
+        metadata: {
+          source: "assessment_submit",
+          phaseDurationSec: body.durationSec ?? null,
+        },
+      };
+    });
 
     const { error: attemptsError } = await supabaseAdmin
       .from("attempts")

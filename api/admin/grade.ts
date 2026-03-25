@@ -16,6 +16,7 @@ import {
 import { supabaseAdmin } from "../_lib/supabase.js";
 import { METHOD_RATIONALE_RUBRIC, POST_TEST_TASKS, PRE_TEST_TASKS } from "../../src/constants.js";
 import type { AssessmentTask } from "../../src/types.js";
+import { isMcqAssessmentTask } from "../../src/assessmentTasks.js";
 
 type GradeRequestBody = {
   passcode?: string;
@@ -234,7 +235,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           throw new Error(`Missing task for ${attempt.id}`);
         }
 
-        const isMcqTask = Boolean(task.choices?.length && task.correctChoiceId);
+        const isMcqTask = isMcqAssessmentTask(task);
         let promptResult: { feedbackScore: FeedbackScore; feedbackText: string };
         if (isMcqTask) {
           promptResult = scoreMcq(task, attempt.selected_choice);

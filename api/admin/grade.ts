@@ -16,6 +16,7 @@ import {
 import { supabaseAdmin } from "../_lib/supabase.js";
 import { METHOD_RATIONALE_RUBRIC, POST_TEST_TASKS, PRE_TEST_TASKS } from "../../src/constants.js";
 import type { AssessmentTask } from "../../src/types.js";
+import { isMcqAssessmentTask } from "../../src/assessmentTasks.js";
 
 type GradeRequestBody = {
   passcode?: string;
@@ -28,6 +29,7 @@ type AttemptRow = {
   question_key: string;
   phase: "pretest" | "posttest";
   prompt_raw: string | null;
+  selected_choice: string | null;
   selected_method: string | null;
   selected_rationale: string | null;
 };
@@ -138,6 +140,33 @@ ${formatScoreTemplate(METHOD_RATIONALE_RUBRIC)}
   return { feedbackScore, feedbackText: extractFeedbackText(response) };
 }
 
+function scoreMcq(task: AssessmentTask, selectedChoice: string | null) {
+  const isCorrect = Boolean(
+    selectedChoice && task.correctChoiceId && selectedChoice === task.correctChoiceId,
+  );
+  const feedbackScore: FeedbackScore = {
+    totalScore: isCorrect ? 1 : 0,
+    maxScore: 1,
+    grade: isCorrect ? "green" : "red",
+    criteriaScores: [
+      {
+        id: "mcq_correctness",
+        label: "MCQ Correctness",
+        score: isCorrect ? 1 : 0,
+        reason: isCorrect
+          ? "Selected the correct option."
+          : `Selected ${selectedChoice || "no option"}. Correct option is ${task.correctChoiceId || "N/A"}.`,
+      },
+    ],
+  };
+  return {
+    feedbackScore,
+    feedbackText: isCorrect
+      ? "Correct answer."
+      : `Incorrect answer. Correct option: ${task.correctChoiceId || "N/A"}.`,
+  };
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (handleOptions(req, res)) {
     return;
@@ -167,7 +196,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     let attemptsQuery = supabaseAdmin
       .from("attempts")
-      .select("id,question_key,phase,prompt_raw,selected_method,selected_rationale")
+      .select(
+        "id,question_key,phase,prompt_raw,selected_choice,selected_method,selected_rationale",
+      )
       .in("phase", ["pretest", "posttest"])
       .eq("grading_status", "pending")
       .order("submitted_at", { ascending: true });
@@ -200,11 +231,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
       try {
         const task = getTask(attempt.phase, attempt.question_key);
-        if (!task || !attempt.prompt_raw?.trim()) {
-          throw new Error(`Missing task or prompt for ${attempt.id}`);
+        if (!task) {
+          throw new Error(`Missing task for ${attempt.id}`);
         }
 
-        const promptResult = await scorePrompt(task, attempt.prompt_raw, task.rubric);
+        const isMcqTask = isMcqAssessmentTask(task);
+        let promptResult: { feedbackScore: FeedbackScore; feedbackText: string };
+        if (isMcqTask) {
+          promptResult = scoreMcq(task, attempt.selected_choice);
+        } else {
+          if (!attempt.prompt_raw?.trim()) {
+            throw new Error(`Missing prompt for ${attempt.id}`);
+          }
+          promptResult = await scorePrompt(task, attempt.prompt_raw, task.rubric);
+        }
         let methodResult:
           | { feedbackScore: FeedbackScore; feedbackText: string }
           | undefined;

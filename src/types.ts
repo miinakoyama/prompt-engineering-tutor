@@ -99,21 +99,42 @@ export interface Module {
   byPersona: Record<UserBackground, ModuleContent>;
 }
 
-export interface AssessmentTask {
+export interface AssessmentTaskBase {
   id: AssessmentTaskId;
   title: string;
   technique: Technique | 'Method Selection';
   scenario: string;
   requirement: string;
   referencePrompt: string;
+  rubric: Rubric;
+}
+
+export interface AssessmentTaskChoice {
+  id: string;
+  text: string;
+}
+
+export type AssessmentMcqTask = AssessmentTaskBase & {
+  choices: AssessmentTaskChoice[];
+  correctChoiceId: string;
+  requiresMethodSelection?: false;
+  referenceMethod?: never;
+  referenceRationale?: never;
+};
+
+export type AssessmentFreeResponseTask = AssessmentTaskBase & {
+  choices?: undefined;
+  correctChoiceId?: undefined;
+  requiresMethodSelection?: boolean;
   referenceMethod?: PromptingMethod;
   referenceRationale?: string;
-  rubric: Rubric;
-  requiresMethodSelection?: boolean;
-}
+};
+
+export type AssessmentTask = AssessmentMcqTask | AssessmentFreeResponseTask;
 
 export interface AssessmentAnswer {
   prompt: string;
+  selectedChoice?: string;
   method?: PromptingMethod;
   rationale?: string;
 }

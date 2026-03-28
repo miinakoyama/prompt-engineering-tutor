@@ -1,3 +1,4 @@
+import "./loadEnv.js";
 import { GoogleGenAI } from "@google/genai";
 
 export type RubricCriterion = {

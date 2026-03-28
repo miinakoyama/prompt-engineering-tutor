@@ -5,7 +5,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowRight, Home, Loader2, RotateCcw, Send } from "lucide-react";
+import {
+  ArrowRight,
+  Home,
+  Lightbulb,
+  Loader2,
+  RotateCcw,
+  Send,
+} from "lucide-react";
 import {
   AssessmentAnswer,
   AssessmentAnswers,
@@ -36,6 +43,7 @@ import {
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   type AdminAttemptRow,
   type AdminDataResponse,
@@ -54,6 +62,18 @@ import { isMcqAssessmentTask } from "./assessmentTasks";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+function getExerciseHint(
+  technique: Technique | undefined,
+  level: Level | undefined,
+  persona: UserBackground | null,
+): string | undefined {
+  if (!technique || !level || !persona) {
+    return undefined;
+  }
+  const moduleDef = MODULES.find((m) => m.id === technique);
+  return moduleDef?.byPersona[persona]?.levels[level]?.hint;
 }
 
 function getRubricForTechnique(technique: Technique): Rubric {
@@ -108,11 +128,10 @@ const EMPTY_PROGRESS: Record<Technique, Level[]> = {
 
 const ASSESSMENT_TASK_IDS: AssessmentTaskId[] = [1, 2, 3, 4];
 const SKILL_LEVEL_OPTIONS = [
-  "1 - Almost none (first time)",
-  "2 - A little (a few times)",
-  "3 - Sometimes (monthly)",
-  "4 - Often (weekly)",
-  "5 - Very experienced",
+  "No experience at all",
+  "Some experience (I heard about it but never tried)",
+  "Moderate experience (I sometimes apply this skill)",
+  "Very experienced (I frequently apply in a correct way)",
 ];
 const CONFIDENCE_OPTIONS = [
   "Not confident",
@@ -206,6 +225,9 @@ export default function App() {
     Record<string, boolean>
   >({});
   const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({});
+  const [openExerciseHints, setOpenExerciseHints] = useState<
+    Record<string, boolean>
+  >({});
   const [methodReviewingLogId, setMethodReviewingLogId] = useState<
     string | null
   >(null);
@@ -479,6 +501,7 @@ export default function App() {
     setIsModuleIntro(true);
     setLogs([]);
     setPromptDrafts({});
+    setOpenExerciseHints({});
     setMethodReviewingLogId(null);
 
     const introLogId = addLog({
@@ -528,6 +551,7 @@ export default function App() {
     setExpandedResults({});
     setFocusLogId(null);
     setPromptDrafts({});
+    setOpenExerciseHints({});
     setMethodReviewingLogId(null);
     setPretestAnswers(createEmptyAssessmentAnswers());
     setPosttestAnswers(createEmptyAssessmentAnswers());
@@ -555,6 +579,7 @@ export default function App() {
     setExpandedResults({});
     setPendingAction(null);
     setPromptDrafts({});
+    setOpenExerciseHints({});
     setMethodReviewingLogId(null);
     startModule("Zero-shot", background);
   };
@@ -1251,14 +1276,14 @@ export default function App() {
                       How would you rate your current prompt engineering skill
                       level?
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {SKILL_LEVEL_OPTIONS.map((option) => (
                         <button
                           key={option}
                           type="button"
                           onClick={() => setPreSkillLevel(option)}
                           className={cn(
-                            "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                            "w-full text-left px-4 py-2 rounded-lg border text-sm font-semibold transition-colors leading-snug",
                             preSkillLevel === option
                               ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
                               : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
@@ -2083,7 +2108,8 @@ export default function App() {
                       {log.type === "intro" && (
                         <div className="space-y-8">
                           {log.content.startsWith("###") &&
-                          !log.content.includes("\n1.") ? (
+                          !log.content.includes("\n1.") &&
+                          !/\n\|/.test(log.content) ? (
                             <div className="max-w-none">
                               <div className="w-12 h-1 gradient-bg mb-6" />
                               <h3 className="text-4xl font-serif font-light text-slate-900 mb-4 tracking-tight">
@@ -2198,9 +2224,17 @@ export default function App() {
                           ) : (
                             <div className="markdown-content text-slate-600 leading-relaxed font-serif text-xl italic">
                               <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
                                 components={{
+                                  h3: ({ children }) => (
+                                    <h3 className="text-4xl font-serif font-light text-slate-900 mb-4 mt-8 first:mt-0 tracking-tight not-italic">
+                                      {children}
+                                    </h3>
+                                  ),
                                   p: ({ children }) => (
-                                    <p className="mb-4 last:mb-0">{children}</p>
+                                    <p className="mb-4 last:mb-0 font-serif italic text-xl">
+                                      {children}
+                                    </p>
                                   ),
                                   ul: ({ children }) => (
                                     <ul className="space-y-4 my-8">
@@ -2219,6 +2253,32 @@ export default function App() {
                                     <strong className="font-bold text-slate-900">
                                       {children}
                                     </strong>
+                                  ),
+                                  table: ({ children }) => (
+                                    <div className="my-8 -mx-1 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm not-italic">
+                                      <table className="w-full min-w-[36rem] text-left text-sm border-collapse">
+                                        {children}
+                                      </table>
+                                    </div>
+                                  ),
+                                  thead: ({ children }) => (
+                                    <thead className="bg-slate-50">{children}</thead>
+                                  ),
+                                  tbody: ({ children }) => (
+                                    <tbody className="divide-y divide-slate-100">
+                                      {children}
+                                    </tbody>
+                                  ),
+                                  tr: ({ children }) => <tr>{children}</tr>,
+                                  th: ({ children }) => (
+                                    <th className="px-4 py-3 font-bold text-slate-900 border-b border-slate-200 align-top font-sans text-xs uppercase tracking-wide">
+                                      {children}
+                                    </th>
+                                  ),
+                                  td: ({ children }) => (
+                                    <td className="px-4 py-3 text-slate-700 align-top font-sans text-base leading-relaxed not-italic">
+                                      {children}
+                                    </td>
                                   ),
                                 }}
                               >
@@ -2243,6 +2303,123 @@ export default function App() {
                               {log.task}
                             </p>
                           </div>
+
+                          {(() => {
+                            const hintText = getExerciseHint(
+                              log.technique,
+                              log.level,
+                              background,
+                            );
+                            if (!hintText) {
+                              return null;
+                            }
+                            return (
+                              <div className="mt-8">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setOpenExerciseHints((prev) => ({
+                                      ...prev,
+                                      [log.id]: !prev[log.id],
+                                    }))
+                                  }
+                                  className={cn(
+                                    "inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                                    openExerciseHints[log.id]
+                                      ? "bg-amber-50 border-amber-200 text-amber-900"
+                                      : "bg-white border-slate-200 text-slate-600 hover:border-brand-orange hover:text-slate-800",
+                                  )}
+                                >
+                                  <Lightbulb
+                                    className="w-4 h-4 shrink-0"
+                                    aria-hidden
+                                  />
+                                  {openExerciseHints[log.id]
+                                    ? "Hide hint"
+                                    : "Hint"}
+                                </button>
+                                {openExerciseHints[log.id] ? (
+                                  <div
+                                    className="mt-3 p-5 rounded-xl border border-amber-100 bg-amber-50/40 markdown-content"
+                                    role="region"
+                                    aria-label="Exercise hint"
+                                  >
+                                    <ReactMarkdown
+                                      components={{
+                                        p: ({ children }) => (
+                                          <p className="mb-3 last:mb-0 text-sm text-slate-700 leading-relaxed">
+                                            {children}
+                                          </p>
+                                        ),
+                                        h3: ({ children }) => (
+                                          <h3 className="text-sm font-bold text-slate-900 mb-2 mt-4 first:mt-0">
+                                            {children}
+                                          </h3>
+                                        ),
+                                        ul: ({ children }) => (
+                                          <ul className="space-y-2 my-3 list-disc pl-5 text-sm text-slate-700">
+                                            {children}
+                                          </ul>
+                                        ),
+                                        ol: ({ children }) => (
+                                          <ol className="space-y-2 my-3 list-decimal pl-5 text-sm text-slate-700">
+                                            {children}
+                                          </ol>
+                                        ),
+                                        li: ({ children }) => (
+                                          <li className="leading-relaxed">
+                                            {children}
+                                          </li>
+                                        ),
+                                        strong: ({ children }) => (
+                                          <strong className="font-semibold text-slate-900">
+                                            {children}
+                                          </strong>
+                                        ),
+                                        code: ({
+                                          className,
+                                          children,
+                                          ...props
+                                        }) => {
+                                          const isFence = Boolean(
+                                            className?.includes("language-"),
+                                          );
+                                          if (isFence) {
+                                            return (
+                                              <code
+                                                className={cn(
+                                                  "block w-full bg-transparent p-0 border-0 font-mono text-xs text-slate-800 leading-relaxed",
+                                                  className,
+                                                )}
+                                                {...props}
+                                              >
+                                                {children}
+                                              </code>
+                                            );
+                                          }
+                                          return (
+                                            <code
+                                              className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-amber-200/90 text-slate-800"
+                                              {...props}
+                                            >
+                                              {children}
+                                            </code>
+                                          );
+                                        },
+                                        pre: ({ children }) => (
+                                          <pre className="my-3 p-4 rounded-lg bg-white/95 border border-amber-200/90 text-slate-800 text-xs overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap shadow-sm">
+                                            {children}
+                                          </pre>
+                                        ),
+                                      }}
+                                    >
+                                      {hintText}
+                                    </ReactMarkdown>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
 
                           {log.level === 1 && (
                             <div className="mt-12 space-y-4">

@@ -378,6 +378,8 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which zero-shot prompt is more likely to give a high-quality, specific result for a class or lesson task?",
+            hint: `### Hint 
+Strong **zero-shot** prompts spell out **format**, **length**, **audience**, and **topic scope**. Weak prompts only name a broad topic. Ask: which option forces a specific, usable deliverable?`,
             choices: [
               {
                 text: "Summarize the causes of World War I.",
@@ -396,6 +398,13 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: 'Task: Write a prompt to explain "Photosynthesis" for an academic audience (students and instructors). Ensure your prompt is specific, sets a tone, defines the audience, and adds constraints (e.g., length or format).',
+            hint: `### How to write a strong zero-shot prompt here
+- **Be specific:** name the concept and what the explanation should cover.
+- **Set the tone:** e.g. clear, educational, appropriate for class use.
+- **Define the audience:** both students and instructors (or who reads it first).
+- **Add constraints:** number of paragraphs or sections, approximate length, bullets vs prose.
+
+You are only writing *instructions* for the model—not the biology content itself.`,
             referencePrompt:
               "Explain the concept of photosynthesis for an introductory biology class handout that can be used by both students and instructors. Use a clear and educational tone. Structure the explanation in 3-4 short paragraphs covering: what photosynthesis is, where it happens, and why it matters. Keep the total length under 200 words.",
             rubric: ZERO_SHOT_RUBRIC,
@@ -412,6 +421,8 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which zero-shot prompt is more likely to give a high-quality, actionable result for a workplace task?",
+            hint: `### Hint 
+Workplace zero-shot prompts usually specify **deliverable type**, **length**, **audience**, **tone**, and **concrete topic**. Vague prompts only ask for a genre (e.g. “a blog post”) without constraints.`,
             choices: [
               {
                 text: "Write a blog post about healthy eating.",
@@ -430,6 +441,13 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: "Task: Write a prompt to draft a short project update email for your manager. Ensure your prompt is specific (project name, timeframe), sets the tone, defines what to include (e.g., progress, blockers, next steps), and any constraints (length, no attachments).",
+            hint: `### How to structure this zero-shot prompt
+- Name the **project** and **reporting period** (e.g. week or sprint).
+- List **must-include bullets**: progress, wins, blockers, next steps—whatever the task asks for.
+- Set **tone** (professional, concise, etc.).
+- Add **constraints**: word limit, no attachments, etc.
+
+Use your own project names and dates; you are not graded on matching any sample wording.`,
             referencePrompt:
               "Draft a project update email to my manager about the Q1 Marketing Dashboard project for the week of March 10-14. Use a professional but concise tone. Include: current progress percentage, one key accomplishment this week, any blockers, and next steps for the coming week. Keep the email under 150 words. No attachments needed.",
             rubric: ZERO_SHOT_RUBRIC,
@@ -455,6 +473,8 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which few-shot prompt better helps the AI classify academic tasks in a consistent format?",
+            hint: `### Hint 
+Few-shot works when every example uses the **same labels, spacing, and line shape**, and the prompt **ends with an unfinished last line** so the model continues the pattern. Inconsistent or mashed-together examples are harder to copy.`,
             choices: [
               {
                 text: 'These are easy: "2+2". These are hard: "Solve the system of equations." Now classify: "Write an essay on symbolism."',
@@ -473,6 +493,17 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: 'Task: Create a few-shot prompt to classify academic support tips as "Time Management", "Learning Strategy", or "Assessment Prep". Provide at least 3 examples in a consistent format (e.g., Tip: ... Category: ...).',
+            hint: `### Example *pattern* (different topic—illustration only)
+Use a **fixed template** for every example, then leave the last category blank:
+
+\`\`\`
+Note: "Need budget sign-off by Friday" → Follow-up: Finance
+Note: "Design review moved to Tuesday" → Follow-up: Calendar
+Note: "Pipeline is blocked on approvals" → Follow-up: Leadership
+Note: [next note here] → Follow-up:
+\`\`\`
+
+Your real exercise uses **Time Management / Learning Strategy / Assessment Prep**—copy this *shape* with **your own** tip text (do not copy any model solution).`,
             referencePrompt:
               'Tip: "Break your study session into 25-minute blocks with 5-minute breaks."\nCategory: Time Management\n\nTip: "Use concept maps to connect key ideas from each lecture."\nCategory: Learning Strategy\n\nTip: "Practice with past exams under timed conditions."\nCategory: Assessment Prep\n\nTip: "Review your notes within 24 hours of class."\nCategory:',
             rubric: FEW_SHOT_RUBRIC,
@@ -490,6 +521,8 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which few-shot prompt better guides the AI to follow a specific format for classifying workplace items (e.g., emails, tickets)?",
+            hint: `### Hint 
+Prefer prompts that repeat **Input:** / **Output:** (or equivalent) **exactly** on every line and end with a fresh **Input:** waiting for the label. Inline parentheses mixed into one paragraph are harder for the model to generalize.`,
             choices: [
               {
                 text: 'Classify these: "I love it" (Positive), "It is bad" (Negative). Now classify: "The food was okay."',
@@ -508,6 +541,15 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: 'Task: Create a few-shot prompt to classify support tickets or customer emails as "Billing", "Technical", or "General". Provide at least 3 examples in a consistent format.',
+            hint: `### Example *pattern* (different labels—practice the shape)
+\`\`\`
+Message: "Double charge on last invoice" → Type: Payments
+Message: "Sync fails after update" → Type: Product
+Message: "What are support hours?" → Type: Info
+Message: [next customer message] → Type:
+\`\`\`
+
+Apply the same rhythm for **Billing / Technical / General** with **original** ticket text.`,
             referencePrompt:
               'Ticket: "I was charged twice for my subscription this month."\nCategory: Billing\n\nTicket: "The app crashes whenever I try to upload a file larger than 10MB."\nCategory: Technical\n\nTicket: "What are your business hours?"\nCategory: General\n\nTicket: "My payment method was declined but I have sufficient funds."\nCategory:',
             rubric: FEW_SHOT_RUBRIC,
@@ -533,6 +575,8 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Scenario: Your school needs to deliver a fragile chemistry apparatus from City A to City D. Route 1 costs $40 with 5% damage risk and takes 4 hours. Route 2 costs $30 with 20% risk and takes 3 hours. If risk is over 15%, insurance adds $15. Which prompt best uses Chain-of-Thought?",
+            hint: `### Hint 
+Strong **Chain-of-Thought** prompts **order** the work: compute costs (with rules like insurance), compare risk and time, check constraints, *then* recommend. Prompts that ask for a final choice in one jump usually skip that scaffolding.`,
             choices: [
               {
                 text: "Choose the best route for the school package.",
@@ -557,6 +601,13 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle.\n\nThe school must deliver a fragile chemistry apparatus from City A to City D.\nRoute 1: A-B-D, cost $40, risk 5%, time 4h.\nRoute 2: A-C-D, cost $30, risk 20%, time 3h.\n\nConstraint: budget is $40, and if risk is over 15%, insurance adds $15.\nYour prompt should make the AI reason step by step and choose the best route.',
+            hint: `### Structure your Chain-of-Thought prompt
+1. Restate **both routes** with cost, risk %, and time.
+2. State the **insurance rule** and **budget** in your own words.
+3. Ask the model to compute **each route’s total cost** (including insurance when the rule fires).
+4. Then compare **risk vs. time**, check the budget, and **only then** pick a route.
+
+Phrases like *think step by step* or *show reasoning before the final answer* help signal CoT.`,
             referencePrompt:
               "A school needs to deliver a fragile chemistry apparatus from City A to City D. Route 1 (A-B-D): cost $40, risk 5%, time 4 hours. Route 2 (A-C-D): cost $30, risk 20%, time 3 hours. If risk is over 15%, insurance adds $15. Budget limit is $40. Think step by step: (1) compute total cost for each route including insurance when needed, (2) compare risk and delivery time, (3) verify budget compliance, and (4) recommend the best route with a short justification.",
             rubric: COT_RUBRIC,
@@ -574,6 +625,8 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Scenario: A company must deliver a fragile medical package from City A to City D. Route 1 costs $40 with 5% risk and 4h. Route 2 costs $30 with 20% risk and 3h. If risk exceeds 15%, insurance adds $15. Which prompt best uses Chain-of-Thought?",
+            hint: `### Hint 
+Look for prompts that **sequence** math (base cost + insurance), **compare** risk and time, **validate** budget, and **then** justify a recommendation—not a one-line “pick a route.”`,
             choices: [
               {
                 text: "Pick the faster route and return only the route name.",
@@ -598,6 +651,12 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle. A company needs to deliver a fragile medical package from City A to City D.\nRoute 1: A-B-D, cost $40, risk 5%, time 4h.\nRoute 2: A-C-D, cost $30, risk 20%, time 3h.\nConstraint: budget is $40, and if risk is over 15%, insurance adds $15.\nYour prompt should force step-by-step reasoning and a final recommendation.',
+            hint: `### Structure your Chain-of-Thought prompt
+1. Embed **all numeric facts** (cost, risk, time) for each route.
+2. Spell out **when insurance applies** and the **budget cap**.
+3. Require **numbered or labeled steps**: totals first, trade-offs second, budget check third, recommendation last.
+
+Use your own step labels; you are guiding the reasoning process, not answering the puzzle yourself.`,
             referencePrompt:
               "A company needs to deliver a fragile medical package from City A to City D. Route 1 (A-B-D): cost $40, risk 5%, time 4 hours. Route 2 (A-C-D): cost $30, risk 20%, time 3 hours. If risk is over 15%, insurance adds $15. Budget is $40. Think step by step: First compute each route's final cost including insurance. Second compare risk and delivery time. Third verify whether each route stays within budget. Finally choose the best route and explain the decision clearly.",
             rubric: COT_RUBRIC,
@@ -617,12 +676,23 @@ export const MODULES: Module[] = [
           "Task: Build a nuanced synthesis across conflicting abstracts.\nTechnique: Zero-shot\nPrompt:\nSummarize these abstracts quickly.",
         goodExample:
           "Task: Build a nuanced synthesis across conflicting abstracts.\nTechnique: Chain-of-Thought\nPrompt:\nThink step by step: identify each paper's core claim, group agreements and disagreements, compare tensions, then propose one unified research question.",
-        instruction:
-          "### How to choose the right technique:\n1. **Match task pattern:** Repeated labeling/classification often benefits from Few-shot.\n2. **Use Zero-shot for direct generation:** Clear one-off outputs usually need strong constraints.\n3. **Use CoT for reasoning:** Multi-constraint logic or planning tasks often need step-by-step reasoning.\n4. **Show the choice through structure:** Let the prompt format naturally reflect the technique you selected.",
+        instruction: `### How to choose the right technique
+
+Connect what you practiced in **Zero-shot**, **Few-shot**, and **Chain-of-Thought** to coursework and research tasks: match the **task pattern** to the **prompt structure** you will use.
+
+| Technique | What it is (in your prompt) | When to choose it |
+| :--- | :--- | :--- |
+| **Zero-shot** | One detailed instruction—**no examples**. You spell out goal, audience, tone, output shape, and limits in plain language. | A **single** deliverable where you can describe “good output” clearly without demonstrating examples (one essay plan, one lab handout spec, one email brief). |
+| **Few-shot** | **Two or more parallel examples** with the **same labels and layout** every time, then a new case for the model to complete. | **Many similar lines**—labeling, rubric-style scoring, templated feedback—where **consistency across items** matters more than deep reasoning on each line. |
+| **Chain-of-Thought (CoT)** | **Numbered steps** or phrases like *think step by step* so the model **shows reasoning before** the final answer. | **Trade-offs, constraints, conflicting evidence, or planning**—when skipping intermediate steps usually produces shallow or wrong conclusions. |
+
+**Make your choice visible:** Shape your prompt so a reader can tell which technique you used—**examples** vs **explicit steps** vs **one rich instruction**—then write the full prompt accordingly.`,
         levels: {
           1: {
             title: "Technique Match",
             task: 'You are a Graduate Research Assistant comparing 10 abstracts about "AI in the Classroom." Some argue AI improves engagement, others argue it increases cognitive load. Your advisor wants a synthesis that maps disagreements and proposes a unified research question. Which prompting method is MOST suitable?',
+            hint: `### Hint 
+Ask whether the core work is **repeating a format** (Few-shot), **one-shot generation with tight specs** (Zero-shot), or **multi-step reasoning across tensions** (Chain-of-Thought). Synthesis across *conflicting claims* usually needs explicit reasoning, not just speed or tone examples.`,
             choices: [
               {
                 text: "A. Zero-shot Prompting: The model can summarize papers instantly.",
@@ -647,6 +717,10 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: "You are a Head TA for a course with 300 students and raw peer-feedback comments. You need to detect non-constructive language, assign Contribution Level (High/Medium/Low), and output: Student Name | Constructive (Y/N) | Contribution | TA Note.",
+            hint: `### After you pick a method (Step 1)
+For **high-volume rows** with a **rigid pipe format**, **Few-shot** often fits: write **2–3 complete example lines** that show the exact **Name | Constructive | Contribution | Note** pattern, then a line with **Input:** (or similar) waiting for the next comment.
+
+Define **what “constructive” means** and **how you judge High/Medium/Low** in plain language. Invent **original** example names and comments—do not copy any reference solution.`,
             referenceMethod: "Few-shot",
             referenceRationale:
               "Few-shot is most efficient and accurate because this is a high-volume, pattern-driven formatting task where consistency is critical across many records.",
@@ -661,12 +735,23 @@ export const MODULES: Module[] = [
           "Task: Summarize a conflict-heavy multi-party email thread.\nTechnique: Zero-shot\nPrompt:\nSummarize this thread in 3 bullets.",
         goodExample:
           "Task: Summarize a conflict-heavy multi-party email thread.\nTechnique: Chain-of-Thought\nPrompt:\nThink step by step: identify each party's position, locate blame-shifting points, infer root cause, then propose a balanced middle-ground solution.",
-        instruction:
-          "### How to choose the right technique:\n1. **Zero-shot:** Best for direct outputs with clear format and constraints.\n2. **Few-shot:** Best when you need consistent style or classification patterns.\n3. **CoT:** Best for multi-step reasoning with dependencies or trade-offs.\n4. **Show the choice through structure:** The wording and format of the prompt should reveal the selected technique.",
+        instruction: `### How to choose the right technique
+
+Apply **Zero-shot**, **Few-shot**, and **Chain-of-Thought** at work: align **how repetitive**, **how ambiguous**, and **how much step-by-step reasoning** the task needs with the right prompt shape.
+
+| Technique | What it is (in your prompt) | When to choose it |
+| :--- | :--- | :--- |
+| **Zero-shot** | One detailed instruction—**no examples**. You spell out goal, audience, tone, output shape, and limits in plain language. | A **single** deliverable where you can describe “good output” clearly without demonstrating examples (one executive summary brief, one stakeholder email, one spec). |
+| **Few-shot** | **Two or more parallel examples** with the **same labels and layout** every time, then a new case for the model to complete. | **High-volume or repetitive** outputs—ticket routing, CRM fields, slide outlines—where **pattern consistency** across rows beats reasoning depth per row. |
+| **Chain-of-Thought (CoT)** | **Numbered steps** or phrases like *think step by step* so the model **shows reasoning before** the final answer. | **Trade-offs, budgets, root-cause analysis, blame-heavy threads, or strategy**—when the wrong answer is costly if intermediate logic is skipped. |
+
+**Make your choice visible:** Shape your prompt so a reader can tell which technique you used—**examples** vs **explicit steps** vs **one rich instruction**—then write the full prompt accordingly.`,
         levels: {
           1: {
             title: "Technique Match",
             task: "You have a 15-email thread between a client, developer, and designer about delays and blame-shifting. Your boss wants a concise executive summary with root cause and a middle-ground solution. Which method is MOST suitable?",
+            hint: `### Hint 
+Blame-shifting threads need **structured comparison** of parties and incentives before a recommendation. Ask whether **step-by-step reasoning** is required versus a quick summary or style-matching examples alone.`,
             choices: [
               {
                 text: "A. Zero-shot Prompting: The LLM already knows summarization and this is fastest.",
@@ -691,6 +776,10 @@ export const MODULES: Module[] = [
           2: {
             title: "Application",
             task: 'Your company is hiring for a niche "Senior EdTech Researcher" role. You must process 200 resumes and output CSV-ready rows: Name | University Match (Y/N) | Fit Score | Reason.',
+            hint: `### After you pick a method (Step 1)
+**Few-shot** helps when every resume must become the **same column shape**. Supply **2–3 full example rows** with the exact **Name | University Match | Fit Score | Reason** layout, then end with **Input:** for the next resume.
+
+State your **target university list** and **fit-score rubric** clearly. Use **fictional** resume snippets in examples—do not lift wording from any model answer.`,
             referenceMethod: "Few-shot",
             referenceRationale:
               "Few-shot is best because converting 200 resumes into a strict output format depends on repeatable examples and stable structure.",

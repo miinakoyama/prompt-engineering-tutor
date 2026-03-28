@@ -75,6 +75,8 @@ export interface Rubric {
 export interface ModuleLevel {
   title: string;
   task: string;
+  /** Methodology hint only—must not restate the reference answer. */
+  hint?: string;
   options?: string[];
   choices?: { text: string; isCorrect: boolean; explanation: string }[];
   blanks?: string[];

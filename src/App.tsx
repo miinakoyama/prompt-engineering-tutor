@@ -779,6 +779,7 @@ export default function App() {
         content: feedbackText,
         reviewType: "feedback",
         feedbackScore: feedbackScore || undefined,
+        referencePrompt: levelData.referencePrompt || "",
         prompt,
         generatedResponse: resultText,
       });
@@ -1078,7 +1079,9 @@ export default function App() {
       setFlowStage("done");
     } catch (error) {
       console.error("Assessment submit error:", error);
-      setAssessmentSubmitError("Failed to submit assessment data. Please try again.");
+      setAssessmentSubmitError(
+        "Failed to submit assessment data. Please try again.",
+      );
     } finally {
       setIsSubmittingAssessment(false);
     }
@@ -1643,10 +1646,14 @@ export default function App() {
       if (!phaseAttempts.length) {
         return "Not submitted";
       }
-      if (phaseAttempts.every((attempt) => attempt.grading_status === "graded")) {
+      if (
+        phaseAttempts.every((attempt) => attempt.grading_status === "graded")
+      ) {
         return "Graded";
       }
-      if (phaseAttempts.some((attempt) => attempt.grading_status === "failed")) {
+      if (
+        phaseAttempts.some((attempt) => attempt.grading_status === "failed")
+      ) {
         return "Needs retry";
       }
       return "Pending";
@@ -1833,14 +1840,17 @@ export default function App() {
                   className="px-4 py-2 rounded-xl gradient-bg text-white font-semibold shadow-md shadow-brand-pink/20 transition-all hover:brightness-110 hover:shadow-lg disabled:opacity-50 disabled:shadow-none disabled:hover:brightness-100"
                 >
                   <span className="inline-flex items-center gap-2">
-                    {adminGrading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {adminGrading && (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    )}
                     {adminGrading ? "Grading..." : "Grade Pre/Post"}
                   </span>
                 </button>
               </div>
             </div>
             <p className="text-xs text-slate-500">
-              Pending pre/post attempts in this view: {filteredPendingAttempts.length}
+              Pending pre/post attempts in this view:{" "}
+              {filteredPendingAttempts.length}
             </p>
             {adminGrading && (
               <p className="text-xs text-brand-pink font-semibold">
@@ -1868,13 +1878,17 @@ export default function App() {
                 </thead>
                 <tbody>
                   {filteredSessions.map((session: AdminSessionRow) => {
-                    const sessionAttempts = attemptsBySessionId[session.id] || [];
+                    const sessionAttempts =
+                      attemptsBySessionId[session.id] || [];
                     const learningCount = new Set(
                       sessionAttempts
                         .filter((attempt) => attempt.phase === "learning")
                         .map((attempt) => attempt.question_key),
                     ).size;
-                    const preStatus = getPhaseGradeStatus(sessionAttempts, "pretest");
+                    const preStatus = getPhaseGradeStatus(
+                      sessionAttempts,
+                      "pretest",
+                    );
                     const postStatus = getPhaseGradeStatus(
                       sessionAttempts,
                       "posttest",
@@ -1888,7 +1902,8 @@ export default function App() {
                           <span
                             className={cn(
                               "px-2 py-1 rounded-full text-xs font-semibold",
-                              (session.app_env || "").toLowerCase() === "production"
+                              (session.app_env || "").toLowerCase() ===
+                                "production"
                                 ? "bg-emerald-100 text-emerald-700"
                                 : "bg-slate-100 text-slate-700",
                             )}
@@ -1899,7 +1914,9 @@ export default function App() {
                         <td className="py-2 pr-4 font-mono text-xs">
                           {session.student_username || "-"}
                         </td>
-                        <td className="py-2 pr-4 font-mono text-xs">{session.id}</td>
+                        <td className="py-2 pr-4 font-mono text-xs">
+                          {session.id}
+                        </td>
                         <td className="py-2 pr-4">
                           {Math.min(learningCount, totalLearningSteps)}/
                           {totalLearningSteps}
@@ -2262,7 +2279,9 @@ export default function App() {
                                     </div>
                                   ),
                                   thead: ({ children }) => (
-                                    <thead className="bg-slate-50">{children}</thead>
+                                    <thead className="bg-slate-50">
+                                      {children}
+                                    </thead>
                                   ),
                                   tbody: ({ children }) => (
                                     <tbody className="divide-y divide-slate-100">
@@ -2588,9 +2607,11 @@ export default function App() {
                                       "p-5 rounded-xl border space-y-4",
                                       log.methodFeedbackScore?.grade === "green"
                                         ? "bg-emerald-50 border-emerald-200"
-                                        : log.methodFeedbackScore?.grade === "yellow"
+                                        : log.methodFeedbackScore?.grade ===
+                                            "yellow"
                                           ? "bg-amber-50 border-amber-200"
-                                          : log.methodFeedbackScore?.grade === "red"
+                                          : log.methodFeedbackScore?.grade ===
+                                              "red"
                                             ? "bg-red-50 border-red-200"
                                             : "bg-white border-slate-200",
                                     )}
@@ -2897,6 +2918,56 @@ export default function App() {
                                 <p className="text-base text-slate-700 leading-relaxed">
                                   {log.content}
                                 </p>
+                              )}
+
+                              {log.referencePrompt && (
+                                <div className="p-5 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                                  <div className="flex items-center justify-between gap-4 mb-3">
+                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">
+                                      Sample Answer
+                                    </p>
+                                    {log.referencePrompt.length > 520 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setExpandedResults((prev) => ({
+                                            ...prev,
+                                            [`${log.id}-reference`]:
+                                              !prev[`${log.id}-reference`],
+                                          }))
+                                        }
+                                        className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                                      >
+                                        {expandedResults[`${log.id}-reference`]
+                                          ? "Collapse"
+                                          : "Expand"}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-indigo-800 mb-3">
+                                    Compare this reference with your own prompt
+                                    to identify what constraints or structure
+                                    you can improve next.
+                                  </p>
+                                  <div className="relative">
+                                    <pre
+                                      className={cn(
+                                        "text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words bg-white border border-indigo-100 rounded-lg p-4",
+                                        !expandedResults[
+                                          `${log.id}-reference`
+                                        ] &&
+                                          log.referencePrompt.length > 520 &&
+                                          "max-h-56 overflow-hidden",
+                                      )}
+                                    >
+                                      {log.referencePrompt}
+                                    </pre>
+                                    {!expandedResults[`${log.id}-reference`] &&
+                                      log.referencePrompt.length > 520 && (
+                                        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none rounded-b-lg" />
+                                      )}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>

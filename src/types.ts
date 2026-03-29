@@ -55,6 +55,7 @@ export interface LogEntry {
   comparisonBad?: string;
   comparisonGood?: string;
   feedbackScore?: FeedbackScore;
+  referencePrompt?: string;
   timestamp: number;
 }
 

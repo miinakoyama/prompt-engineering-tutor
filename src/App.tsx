@@ -1618,6 +1618,13 @@ export default function App() {
     const filteredSessions = sessions.filter(matchesEnvFilter);
     const filteredPendingAttempts = pendingAttempts.filter(matchesEnvFilter);
     const filteredAttempts = attempts.filter(matchesEnvFilter);
+    const filteredRetryAttempts = filteredAttempts.filter(
+      (attempt: AdminAttemptRow) =>
+        (attempt.phase === "pretest" || attempt.phase === "posttest") &&
+        attempt.grading_status === "failed",
+    );
+    const pendingOrRetryCount =
+      filteredPendingAttempts.length + filteredRetryAttempts.length;
     const uniqueUsers = new Set(
       filteredSessions
         .map((session: AdminSessionRow) =>
@@ -1835,7 +1842,7 @@ export default function App() {
                     adminLoading ||
                     adminGrading ||
                     !adminAuthorized ||
-                    filteredPendingAttempts.length === 0
+                    pendingOrRetryCount === 0
                   }
                   className="px-4 py-2 rounded-xl gradient-bg text-white font-semibold shadow-md shadow-brand-pink/20 transition-all hover:brightness-110 hover:shadow-lg disabled:opacity-50 disabled:shadow-none disabled:hover:brightness-100"
                 >
@@ -1849,8 +1856,8 @@ export default function App() {
               </div>
             </div>
             <p className="text-xs text-slate-500">
-              Pending pre/post attempts in this view:{" "}
-              {filteredPendingAttempts.length}
+              Ready for grading in this view: {filteredPendingAttempts.length} pending +{" "}
+              {filteredRetryAttempts.length} needs retry
             </p>
             {adminGrading && (
               <p className="text-xs text-brand-pink font-semibold">
@@ -1959,7 +1966,7 @@ export default function App() {
                   Confirm Grading
                 </h3>
                 <p className="text-slate-600">
-                  This will grade all currently pending pre/post attempts in the
+                  This will grade all pending and needs-retry pre/post attempts in the
                   selected environment. Continue?
                 </p>
                 <div className="flex justify-end gap-2">

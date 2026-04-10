@@ -955,13 +955,22 @@ export default function App() {
       // rationale rubric scores. A second attempt is only offered when the method is wrong.
       const completeStep = isMethodCorrect || nextAttempt >= 2;
 
+      const retryHintText =
+        "You can revise your method and rationale and submit one more time.";
+      let methodFeedbackRetryHint: string | undefined;
       if (!completeStep) {
-        composedMethodFeedback +=
-          "\n\nYou can revise your method and rationale and submit one more time.";
+        methodFeedbackRetryHint = retryHintText;
       } else if (nextAttempt >= 2 && !isMethodCorrect) {
         composedMethodFeedback +=
           "\n\nYou've used both attempts. Continue to Step 2 using the correct method above.";
       }
+
+      const feedbackTextForSave = [
+        composedMethodFeedback,
+        methodFeedbackRetryHint,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       setLogs((prev) =>
         prev.map((log) =>
@@ -971,7 +980,14 @@ export default function App() {
                 methodSelectionAttempts: nextAttempt,
                 methodStepCompleted: completeStep,
                 methodFeedback: composedMethodFeedback,
+                methodFeedbackRetryHint,
                 methodFeedbackScore,
+                ...(!completeStep
+                  ? {
+                      selectedMethod: undefined,
+                      selectedRationale: "",
+                    }
+                  : {}),
               }
             : log,
         ),
@@ -989,7 +1005,7 @@ export default function App() {
           questionTitle: "Technique Selection Method Review",
           selectedMethod: targetLog.selectedMethod,
           selectedRationale: targetLog.selectedRationale,
-          feedbackText: composedMethodFeedback,
+          feedbackText: feedbackTextForSave,
           gradingStatus: "graded",
           scoreTotal: methodFeedbackScore.totalScore,
           scoreMax: methodFeedbackScore.maxScore,
@@ -2380,9 +2396,18 @@ export default function App() {
                           </p>
 
                           <div className="space-y-6">
-                            <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
-                              {log.title}
-                            </p>
+                            <div className="space-y-2">
+                              <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand-orange">
+                                {log.title}
+                              </p>
+                              {log.technique === "Technique Selection" &&
+                                log.level === 2 && (
+                                  <p className="text-sm font-medium text-slate-600 normal-case tracking-normal">
+                                    Step 1 (method selection) allows a maximum
+                                    of 2 attempts.
+                                  </p>
+                                )}
+                            </div>
                             <p className="text-2xl font-serif font-light text-slate-900 leading-relaxed whitespace-pre-line">
                               {log.task}
                             </p>
@@ -2735,6 +2760,11 @@ export default function App() {
                                           {log.methodFeedback && (
                                             <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                               {log.methodFeedback}
+                                            </p>
+                                          )}
+                                          {log.methodFeedbackRetryHint && (
+                                            <p className="text-base font-bold text-slate-900 leading-relaxed mt-3">
+                                              {log.methodFeedbackRetryHint}
                                             </p>
                                           )}
                                         </div>

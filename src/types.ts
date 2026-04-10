@@ -45,6 +45,8 @@ export interface LogEntry {
   /** Technique Selection L2 step 1: number of method submissions (max 2). */
   methodSelectionAttempts?: number;
   methodFeedback?: string;
+  /** Shown in bold below method feedback when another Step 1 attempt is allowed. */
+  methodFeedbackRetryHint?: string;
   methodFeedbackScore?: FeedbackScore;
   isCorrect?: boolean;
   explanation?: string;

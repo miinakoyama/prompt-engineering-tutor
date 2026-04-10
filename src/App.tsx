@@ -648,11 +648,103 @@ export default function App() {
     choice: { text: string; isCorrect: boolean; explanation: string },
     logId: string,
   ) => {
+    const targetLog = logs.find((entry) => entry.id === logId);
+    const isTsL1 =
+      targetLog?.technique === "Technique Selection" &&
+      targetLog?.level === 1;
+    const prevMcqAttempts = targetLog?.mcqAttempts ?? 0;
+
+    if (isTsL1) {
+      if (prevMcqAttempts >= 2) {
+        return;
+      }
+      if (
+        targetLog?.selectedChoice &&
+        (targetLog.isCorrect === true || prevMcqAttempts >= 2)
+      ) {
+        return;
+      }
+    }
+
+    const nextMcqAttempt = prevMcqAttempts + 1;
+    const mcqCompleteNow =
+      !isTsL1 || choice.isCorrect || nextMcqAttempt >= 2;
+
+    if (isTsL1 && !mcqCompleteNow) {
+      const choiceFeedback = `**Not quite**\n\n${choice.explanation}`;
+      const choiceRetryHint = "You can choose again—one more attempt.";
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.id === logId
+            ? {
+                ...log,
+                mcqAttempts: nextMcqAttempt,
+                choiceFeedback,
+                choiceRetryHint,
+                selectedChoice: undefined,
+                isCorrect: undefined,
+                explanation: undefined,
+              }
+            : log,
+        ),
+      );
+
+      const questionKey = `learning-${currentTechnique}-${currentLevel}-mcq-${nextMcqAttempt}`;
+      const startedAt = questionStartedAt[`learning-${currentTechnique}-${currentLevel}`];
+      const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
+      if (sessionId) {
+        void saveAttempt({
+          sessionId,
+          phase: "learning",
+          technique: currentTechnique,
+          level: currentLevel,
+          questionKey,
+          questionTitle: `Level ${currentLevel} MCQ`,
+          selectedChoice: choice.text,
+          isCorrect: false,
+          feedbackText: [choiceFeedback, choiceRetryHint]
+            .filter(Boolean)
+            .join("\n\n"),
+          gradingStatus: "graded",
+          scoreTotal: 0,
+          scoreMax: 4,
+          durationSec,
+          submittedAt: Date.now(),
+          metadata: {
+            stage: "technique_selection_mcq",
+            attempt: nextMcqAttempt,
+            stepCompleted: false,
+          },
+        }).catch((error) =>
+          console.error("Failed to save learning choice attempt", error),
+        );
+        void saveEvent(
+          "learning_choice_submitted",
+          {
+            isCorrect: false,
+            durationSec,
+            attempt: nextMcqAttempt,
+            stepCompleted: false,
+          },
+          currentTechnique,
+          currentLevel,
+        );
+      }
+      return;
+    }
+
     setLogs((prev) =>
       prev.map((log) => {
         if (log.id === logId) {
           return {
             ...log,
+            ...(isTsL1
+              ? {
+                  mcqAttempts: nextMcqAttempt,
+                  choiceFeedback: undefined,
+                  choiceRetryHint: undefined,
+                }
+              : {}),
             selectedChoice: choice.text,
             isCorrect: choice.isCorrect,
             explanation: choice.explanation,
@@ -669,8 +761,10 @@ export default function App() {
       reviewType: "choice",
     });
 
-    const questionKey = `learning-${currentTechnique}-${currentLevel}`;
-    const startedAt = questionStartedAt[questionKey];
+    const questionKey = isTsL1
+      ? `learning-${currentTechnique}-${currentLevel}-mcq-${nextMcqAttempt}`
+      : `learning-${currentTechnique}-${currentLevel}`;
+    const startedAt = questionStartedAt[`learning-${currentTechnique}-${currentLevel}`];
     const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
     if (sessionId) {
       void saveAttempt({
@@ -688,12 +782,25 @@ export default function App() {
         scoreMax: 4,
         durationSec,
         submittedAt: Date.now(),
+        ...(isTsL1
+          ? {
+              metadata: {
+                stage: "technique_selection_mcq",
+                attempt: nextMcqAttempt,
+                stepCompleted: true,
+              },
+            }
+          : {}),
       }).catch((error) =>
         console.error("Failed to save learning choice attempt", error),
       );
       void saveEvent(
         "learning_choice_submitted",
-        { isCorrect: choice.isCorrect, durationSec },
+        {
+          isCorrect: choice.isCorrect,
+          durationSec,
+          ...(isTsL1 ? { attempt: nextMcqAttempt, stepCompleted: true } : {}),
+        },
         currentTechnique,
         currentLevel,
       );
@@ -733,18 +840,29 @@ export default function App() {
 
     const activeTechnique = currentTechnique;
     const activeLevel = currentLevel;
+    const isTsL2 =
+      targetLog?.technique === "Technique Selection" &&
+      targetLog?.level === 2;
+    const prevPromptAttempts = targetLog?.promptAttempts ?? 0;
+
+    if (isTsL2 && prevPromptAttempts >= 2) {
+      return;
+    }
+
     const module = MODULES.find((item) => item.id === activeTechnique)!;
     const moduleContent = module.byPersona[background];
     const levelTask = moduleContent.levels[activeLevel].task;
 
-    setLogs((prev) =>
-      prev.map((log) => {
-        if (log.id === logId) {
-          return { ...log, submittedPrompt: prompt };
-        }
-        return log;
-      }),
-    );
+    if (!isTsL2) {
+      setLogs((prev) =>
+        prev.map((log) => {
+          if (log.id === logId) {
+            return { ...log, submittedPrompt: prompt };
+          }
+          return log;
+        }),
+      );
+    }
 
     setPendingAction(null);
     setIsWaitingForResult(true);
@@ -774,9 +892,113 @@ export default function App() {
       const feedbackScore = gradingResult.feedbackScore;
       const feedbackText = gradingResult.feedbackText;
 
+      const nextPromptAttempt = prevPromptAttempts + 1;
+      const isFullyCorrect = feedbackScore?.grade === "green";
+      const promptCompleteNow =
+        !isTsL2 || isFullyCorrect || nextPromptAttempt >= 2;
+
+      if (isTsL2 && !promptCompleteNow) {
+        const promptStepRetryHint =
+          "Revise your prompt based on the feedback below and submit one more time.";
+        const feedbackTextForSave = [feedbackText, promptStepRetryHint]
+          .filter(Boolean)
+          .join("\n\n");
+
+        setLogs((prev) =>
+          prev.map((log) =>
+            log.id === logId
+              ? {
+                  ...log,
+                  promptAttempts: nextPromptAttempt,
+                  promptStepFeedback: feedbackText || "",
+                  promptStepFeedbackScore: feedbackScore || undefined,
+                  promptStepRetryHint,
+                  submittedPrompt: undefined,
+                }
+              : log,
+          ),
+        );
+        setIsWaitingForResult(false);
+
+        const questionKey = `learning-${activeTechnique}-${activeLevel}-prompt-${nextPromptAttempt}`;
+        const startedAt = questionStartedAt[
+          `learning-${activeTechnique}-${activeLevel}`
+        ];
+        const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
+        if (sessionId) {
+          void saveAttempt({
+            sessionId,
+            phase: "learning",
+            technique: activeTechnique,
+            level: activeLevel,
+            questionKey,
+            questionTitle: `Level ${activeLevel} prompt`,
+            promptRaw: prompt,
+            aiResponse: resultText,
+            feedbackText: feedbackTextForSave,
+            gradingStatus: "graded",
+            scoreTotal: feedbackScore?.totalScore,
+            scoreMax: feedbackScore?.maxScore,
+            durationSec,
+            submittedAt: Date.now(),
+            gradedAt: Date.now(),
+            selectedMethod: selectedMethod,
+            selectedRationale: targetLog?.selectedRationale,
+            criteriaScores: feedbackScore?.criteriaScores,
+            metadata: {
+              stage: "technique_selection_prompt",
+              attempt: nextPromptAttempt,
+              stepCompleted: false,
+            },
+          }).catch((error) =>
+            console.error("Failed to save learning prompt attempt", error),
+          );
+          void saveEvent(
+            "learning_prompt_submitted",
+            {
+              durationSec,
+              totalScore: feedbackScore?.totalScore,
+              maxScore: feedbackScore?.maxScore,
+              attempt: nextPromptAttempt,
+              stepCompleted: false,
+            },
+            activeTechnique,
+            activeLevel,
+          );
+        }
+        return;
+      }
+
+      const reviewContent =
+        isTsL2 &&
+        nextPromptAttempt >= 2 &&
+        !isFullyCorrect &&
+        feedbackText
+          ? `${feedbackText}\n\nYou've used both attempts on this prompt. You can continue when you're ready.`
+          : feedbackText;
+
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.id === logId
+            ? {
+                ...log,
+                submittedPrompt: prompt,
+                ...(isTsL2
+                  ? {
+                      promptAttempts: nextPromptAttempt,
+                      promptStepFeedback: undefined,
+                      promptStepFeedbackScore: undefined,
+                      promptStepRetryHint: undefined,
+                    }
+                  : {}),
+              }
+            : log,
+        ),
+      );
+
       const reviewLogId = addLog({
         type: "review",
-        content: feedbackText,
+        content: reviewContent,
         reviewType: "feedback",
         feedbackScore: feedbackScore || undefined,
         referencePrompt: levelData.referencePrompt || "",
@@ -792,8 +1014,12 @@ export default function App() {
       setIsWaitingForResult(false);
 
       markLevelComplete(activeTechnique, activeLevel);
-      const questionKey = `learning-${activeTechnique}-${activeLevel}`;
-      const startedAt = questionStartedAt[questionKey];
+      const questionKey = isTsL2
+        ? `learning-${activeTechnique}-${activeLevel}-prompt-${nextPromptAttempt}`
+        : `learning-${activeTechnique}-${activeLevel}`;
+      const startedAt = questionStartedAt[
+        `learning-${activeTechnique}-${activeLevel}`
+      ];
       const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
       if (sessionId) {
         void saveAttempt({
@@ -805,7 +1031,7 @@ export default function App() {
           questionTitle: `Level ${activeLevel}`,
           promptRaw: prompt,
           aiResponse: resultText,
-          feedbackText,
+          feedbackText: reviewContent,
           gradingStatus: "graded",
           scoreTotal: feedbackScore?.totalScore,
           scoreMax: feedbackScore?.maxScore,
@@ -815,6 +1041,15 @@ export default function App() {
           selectedMethod: selectedMethod,
           selectedRationale: targetLog?.selectedRationale,
           criteriaScores: feedbackScore?.criteriaScores,
+          ...(isTsL2
+            ? {
+                metadata: {
+                  stage: "technique_selection_prompt",
+                  attempt: nextPromptAttempt,
+                  stepCompleted: true,
+                },
+              }
+            : {}),
         }).catch((error) =>
           console.error("Failed to save learning prompt attempt", error),
         );
@@ -824,6 +1059,12 @@ export default function App() {
             durationSec,
             totalScore: feedbackScore?.totalScore,
             maxScore: feedbackScore?.maxScore,
+            ...(isTsL2
+              ? {
+                  attempt: nextPromptAttempt,
+                  stepCompleted: true,
+                }
+              : {}),
           },
           activeTechnique,
           activeLevel,
@@ -2401,11 +2642,24 @@ export default function App() {
                                 {log.title}
                               </p>
                               {log.technique === "Technique Selection" &&
-                                log.level === 2 && (
+                                log.level === 1 && (
                                   <p className="text-sm font-medium text-slate-600 normal-case tracking-normal">
-                                    Step 1 (method selection) allows a maximum
-                                    of 2 attempts.
+                                    This multiple-choice question allows a
+                                    maximum of 2 attempts.
                                   </p>
+                                )}
+                              {log.technique === "Technique Selection" &&
+                                log.level === 2 && (
+                                  <div className="space-y-1 text-sm font-medium text-slate-600 normal-case tracking-normal">
+                                    <p>
+                                      Step 1 (method selection) allows a
+                                      maximum of 2 attempts.
+                                    </p>
+                                    <p>
+                                      Step 2 (writing your prompt) allows a
+                                      maximum of 2 attempts.
+                                    </p>
+                                  </div>
                                 )}
                             </div>
                             <p className="text-2xl font-serif font-light text-slate-900 leading-relaxed whitespace-pre-line">
@@ -2532,24 +2786,44 @@ export default function App() {
 
                           {log.level === 1 && (
                             <div className="mt-12 space-y-4">
+                              {log.technique === "Technique Selection" &&
+                                !(
+                                  log.selectedChoice &&
+                                  (log.isCorrect === true ||
+                                    (log.mcqAttempts ?? 0) >= 2)
+                                ) && (
+                                  <p className="text-xs font-semibold text-slate-600">
+                                    Attempt {(log.mcqAttempts ?? 0) + 1} of 2
+                                  </p>
+                                )}
                               {MODULES.find(
                                 (module) => module.id === log.technique,
                               )?.byPersona[background].levels[1].choices?.map(
                                 (choice, idx) => {
+                                  const isTsL1Mcq =
+                                    log.technique === "Technique Selection" &&
+                                    log.level === 1;
+                                  const choiceLocked = isTsL1Mcq
+                                    ? !!(
+                                        log.selectedChoice &&
+                                        (log.isCorrect === true ||
+                                          (log.mcqAttempts ?? 0) >= 2)
+                                      )
+                                    : !!log.selectedChoice;
                                   const isSelected =
                                     log.selectedChoice === choice.text;
-                                  const hasSelected = !!log.selectedChoice;
+                                  const hasSelection = !!log.selectedChoice;
 
                                   return (
                                     <button
                                       key={idx}
-                                      disabled={hasSelected}
+                                      disabled={choiceLocked}
                                       onClick={() =>
                                         handleChoiceSelect(choice, log.id)
                                       }
                                       className={cn(
                                         "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
-                                        !hasSelected
+                                        !hasSelection
                                           ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
                                           : isSelected
                                             ? choice.isCorrect
@@ -2562,7 +2836,7 @@ export default function App() {
                                         <div
                                           className={cn(
                                             "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
-                                            !hasSelected
+                                            !hasSelection
                                               ? "border-slate-200 group-hover:border-brand-pink"
                                               : isSelected
                                                 ? choice.isCorrect
@@ -2594,6 +2868,36 @@ export default function App() {
                                   );
                                 },
                               )}
+                              {log.technique === "Technique Selection" &&
+                                log.choiceFeedback && (
+                                  <div className="p-5 rounded-xl border border-red-100 bg-red-50/40 markdown-content space-y-3">
+                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                      Question Feedback
+                                    </p>
+                                    <ReactMarkdown
+                                      remarkPlugins={[remarkGfm]}
+                                      components={{
+                                        p: ({ children }) => (
+                                          <p className="text-base text-slate-700 leading-relaxed mb-2 last:mb-0">
+                                            {children}
+                                          </p>
+                                        ),
+                                        strong: ({ children }) => (
+                                          <strong className="font-bold text-slate-900">
+                                            {children}
+                                          </strong>
+                                        ),
+                                      }}
+                                    >
+                                      {log.choiceFeedback}
+                                    </ReactMarkdown>
+                                    {log.choiceRetryHint && (
+                                      <p className="text-base font-bold text-slate-900 leading-relaxed">
+                                        {log.choiceRetryHint}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                             </div>
                           )}
 
@@ -2788,13 +3092,22 @@ export default function App() {
                                     log.level === 2 &&
                                     log.methodStepCompleted && (
                                       <>
-                                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                                          Step 2: Write Your Prompt
-                                        </p>
+                                        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                            Step 2: Write Your Prompt
+                                          </p>
+                                          {!log.submittedPrompt && (
+                                            <p className="text-xs font-semibold text-slate-600">
+                                              Attempt{" "}
+                                              {(log.promptAttempts ?? 0) + 1}{" "}
+                                              of 2
+                                            </p>
+                                          )}
+                                        </div>
                                         <p className="text-sm text-slate-700 leading-relaxed">
-                                          Based on the method feedback above, use the correct
-                                          prompting technique, write your full
-                                          prompt and submit it.
+                                          Based on the method feedback above,
+                                          use the correct prompting technique,
+                                          write your full prompt and submit it.
                                         </p>
                                       </>
                                     )}
@@ -2849,6 +3162,71 @@ export default function App() {
                                       </>
                                     )}
                                   </div>
+                                  {log.technique === "Technique Selection" &&
+                                    log.level === 2 &&
+                                    log.methodStepCompleted &&
+                                    (log.promptAttempts ?? 0) >= 1 &&
+                                    log.promptStepFeedback && (
+                                      <div
+                                        className={cn(
+                                          "p-5 rounded-xl border space-y-4",
+                                          log.promptStepFeedbackScore
+                                            ?.grade === "green"
+                                            ? "bg-emerald-50 border-emerald-200"
+                                            : log.promptStepFeedbackScore
+                                                  ?.grade === "yellow"
+                                              ? "bg-amber-50 border-amber-200"
+                                              : log.promptStepFeedbackScore
+                                                    ?.grade === "red"
+                                                ? "bg-red-50 border-red-200"
+                                                : "bg-white border-slate-200",
+                                        )}
+                                      >
+                                        <div className="flex items-center justify-between gap-3">
+                                          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                            Prompt Feedback
+                                          </p>
+                                          {log.promptStepFeedbackScore && (
+                                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2 shrink-0">
+                                              <span className="text-[11px] font-medium text-slate-600 text-right leading-snug max-w-[12rem] sm:max-w-none">
+                                                AI-evaluated score for your
+                                                answer (earned / total points)
+                                              </span>
+                                              <span
+                                                className={cn(
+                                                  "px-3 py-1 rounded-full text-xs font-semibold tabular-nums",
+                                                  log.promptStepFeedbackScore
+                                                    .grade === "green"
+                                                    ? "bg-emerald-100 text-emerald-700"
+                                                    : log.promptStepFeedbackScore
+                                                          .grade === "yellow"
+                                                      ? "bg-amber-100 text-amber-700"
+                                                      : "bg-red-100 text-red-700",
+                                                )}
+                                              >
+                                                {
+                                                  log.promptStepFeedbackScore
+                                                    .totalScore
+                                                }
+                                                /
+                                                {
+                                                  log.promptStepFeedbackScore
+                                                    .maxScore
+                                                }
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
+                                          {log.promptStepFeedback}
+                                        </p>
+                                        {log.promptStepRetryHint && (
+                                          <p className="text-base font-bold text-slate-900 leading-relaxed mt-3">
+                                            {log.promptStepRetryHint}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
                                 </div>
                               )}
                             </div>

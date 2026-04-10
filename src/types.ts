@@ -39,6 +39,10 @@ export interface LogEntry {
   prompt?: string;
   generatedResponse?: string;
   selectedChoice?: string;
+  /** Technique Selection L1 MCQ: submission count (max 2). */
+  mcqAttempts?: number;
+  choiceFeedback?: string;
+  choiceRetryHint?: string;
   selectedMethod?: PromptingMethod;
   selectedRationale?: string;
   methodStepCompleted?: boolean;
@@ -53,6 +57,11 @@ export interface LogEntry {
   technique?: Technique;
   level?: Level;
   submittedPrompt?: string;
+  /** Technique Selection L2 Step 2: prompt submission count (max 2). */
+  promptAttempts?: number;
+  promptStepFeedback?: string;
+  promptStepFeedbackScore?: FeedbackScore;
+  promptStepRetryHint?: string;
   title?: string;
   task?: string;
   reviewType?: 'choice' | 'feedback';

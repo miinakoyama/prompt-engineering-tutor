@@ -888,6 +888,15 @@ export default function App() {
       return;
     }
 
+    if (targetLog.methodStepCompleted) {
+      return;
+    }
+
+    const prevAttempts = targetLog.methodSelectionAttempts ?? 0;
+    if (prevAttempts >= 2) {
+      return;
+    }
+
     const module = MODULES.find((item) => item.id === targetLog.technique)!;
     const levelData = module.byPersona[background].levels[targetLog.level || 2];
 
@@ -903,23 +912,71 @@ export default function App() {
         rubric: METHOD_RATIONALE_RUBRIC,
       });
       const methodFeedbackScore = result.feedbackScore;
-      const feedbackText = result.feedbackText;
+      const feedbackText = result.feedbackText?.trim();
+      const refMethod = levelData.referenceMethod;
+      const refRationale = levelData.referenceRationale?.trim() ?? "";
+      const selectedMethod = targetLog.selectedMethod;
+
+      const methodLines: string[] = [];
+      if (refMethod) {
+        methodLines.push(
+          `Correct method for this task: ${refMethod}. ${refRationale}`,
+        );
+      }
+      if (
+        refMethod &&
+        selectedMethod &&
+        selectedMethod !== refMethod &&
+        levelData.incorrectMethodFeedback?.[selectedMethod]
+      ) {
+        methodLines.push(
+          `Why ${selectedMethod} is not the best fit here: ${levelData.incorrectMethodFeedback[selectedMethod]}`,
+        );
+      } else if (refMethod && selectedMethod && selectedMethod !== refMethod) {
+        methodLines.push(
+          `Why ${selectedMethod} is not the best fit here: For this scenario, another technique matches the task structure better than ${selectedMethod}.`,
+        );
+      }
+      if (feedbackText) {
+        methodLines.push(`Notes on your rationale:\n${feedbackText}`);
+      }
+      let composedMethodFeedback =
+        methodLines.join("\n\n") ||
+        feedbackText ||
+        "Nice start. Refine your method rationale to align with task structure.";
+
+      const nextAttempt = prevAttempts + 1;
+      const isMethodCorrect = !!(
+        refMethod &&
+        selectedMethod &&
+        selectedMethod === refMethod
+      );
+      // Step 1 completes as soon as the method matches the reference, regardless of
+      // rationale rubric scores. A second attempt is only offered when the method is wrong.
+      const completeStep = isMethodCorrect || nextAttempt >= 2;
+
+      if (!completeStep) {
+        composedMethodFeedback +=
+          "\n\nYou can revise your method and rationale and submit one more time.";
+      } else if (nextAttempt >= 2 && !isMethodCorrect) {
+        composedMethodFeedback +=
+          "\n\nYou've used both attempts. Continue to Step 2 using the correct method above.";
+      }
 
       setLogs((prev) =>
         prev.map((log) =>
           log.id === logId
             ? {
                 ...log,
-                methodStepCompleted: true,
-                methodFeedback:
-                  feedbackText ||
-                  "Nice start. Refine your method rationale to align with task structure.",
+                methodSelectionAttempts: nextAttempt,
+                methodStepCompleted: completeStep,
+                methodFeedback: composedMethodFeedback,
                 methodFeedbackScore,
               }
             : log,
         ),
       );
-      const questionKey = "learning-Technique Selection-2-method";
+      const questionKey = `learning-Technique Selection-2-method-${nextAttempt}`;
       const startedAt = questionStartedAt[questionKey];
       const durationSec = startedAt ? durationSeconds(startedAt) : undefined;
       if (sessionId) {
@@ -932,7 +989,7 @@ export default function App() {
           questionTitle: "Technique Selection Method Review",
           selectedMethod: targetLog.selectedMethod,
           selectedRationale: targetLog.selectedRationale,
-          feedbackText,
+          feedbackText: composedMethodFeedback,
           gradingStatus: "graded",
           scoreTotal: methodFeedbackScore.totalScore,
           scoreMax: methodFeedbackScore.maxScore,
@@ -940,7 +997,12 @@ export default function App() {
           submittedAt: Date.now(),
           gradedAt: Date.now(),
           criteriaScores: methodFeedbackScore.criteriaScores,
-          metadata: { stage: "method_selection" },
+          metadata: {
+            stage: "method_selection",
+            attempt: nextAttempt,
+            methodCorrect: isMethodCorrect,
+            step1Completed: completeStep,
+          },
         }).catch((error) =>
           console.error("Failed to save method review attempt", error),
         );
@@ -951,6 +1013,9 @@ export default function App() {
           selectedMethod: targetLog.selectedMethod,
           totalScore: methodFeedbackScore.totalScore,
           maxScore: methodFeedbackScore.maxScore,
+          attempt: nextAttempt,
+          methodCorrect: isMethodCorrect,
+          step1Completed: completeStep,
         },
         targetLog.technique,
         targetLog.level,
@@ -2511,139 +2576,170 @@ export default function App() {
                             <div className="mt-12 space-y-5">
                               {log.technique === "Technique Selection" &&
                                 log.level === 2 && (
-                                  <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
-                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                                      Step 1: Select Method and Explain Why
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {METHOD_OPTIONS.map((method) => (
-                                        <button
-                                          key={method}
-                                          type="button"
-                                          disabled={!!log.methodStepCompleted}
-                                          onClick={() =>
-                                            setLogs((prev) =>
-                                              prev.map((entry) =>
-                                                entry.id === log.id
-                                                  ? {
-                                                      ...entry,
-                                                      selectedMethod: method,
-                                                    }
-                                                  : entry,
-                                              ),
-                                            )
-                                          }
-                                          className={cn(
-                                            "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
-                                            log.selectedMethod === method
-                                              ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
-                                              : "bg-white border-slate-200 text-slate-600",
-                                            log.methodStepCompleted &&
-                                              "opacity-70 cursor-not-allowed",
-                                          )}
-                                        >
-                                          {method}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <textarea
-                                      placeholder="Why is this method the best fit?"
-                                      value={log.selectedRationale || ""}
-                                      readOnly={!!log.methodStepCompleted}
-                                      onChange={(event) =>
-                                        setLogs((prev) =>
-                                          prev.map((entry) =>
-                                            entry.id === log.id
-                                              ? {
-                                                  ...entry,
-                                                  selectedRationale:
-                                                    event.target.value,
-                                                }
-                                              : entry,
-                                          ),
-                                        )
-                                      }
-                                      className={cn(
-                                        "w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[100px]",
-                                        log.methodStepCompleted &&
-                                          "bg-slate-100 text-slate-600",
-                                      )}
-                                    />
-                                    {!log.methodStepCompleted && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleTechniqueSelectionMethodSubmit(
-                                            log.id,
+                                  <>
+                                    <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
+                                      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                          Step 1: Select Method and Explain Why
+                                        </p>
+                                        {!log.methodStepCompleted && (
+                                          <p className="text-xs font-semibold text-slate-600">
+                                            Attempt{" "}
+                                            {(log.methodSelectionAttempts ??
+                                              0) + 1}{" "}
+                                            of 2
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {METHOD_OPTIONS.map((method) => (
+                                          <button
+                                            key={method}
+                                            type="button"
+                                            disabled={
+                                              !!log.methodStepCompleted
+                                            }
+                                            onClick={() =>
+                                              setLogs((prev) =>
+                                                prev.map((entry) =>
+                                                  entry.id === log.id
+                                                    ? {
+                                                        ...entry,
+                                                        selectedMethod: method,
+                                                      }
+                                                    : entry,
+                                                ),
+                                              )
+                                            }
+                                            className={cn(
+                                              "px-4 py-2 rounded-lg border text-sm font-semibold transition-colors",
+                                              log.selectedMethod === method
+                                                ? "bg-brand-pink/10 border-brand-pink text-brand-pink"
+                                                : "bg-white border-slate-200 text-slate-600",
+                                              log.methodStepCompleted &&
+                                                "opacity-70 cursor-not-allowed",
+                                            )}
+                                          >
+                                            {method}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <textarea
+                                        placeholder="Why is this method the best fit?"
+                                        value={log.selectedRationale || ""}
+                                        readOnly={!!log.methodStepCompleted}
+                                        onChange={(event) =>
+                                          setLogs((prev) =>
+                                            prev.map((entry) =>
+                                              entry.id === log.id
+                                                ? {
+                                                    ...entry,
+                                                    selectedRationale:
+                                                      event.target.value,
+                                                  }
+                                                : entry,
+                                            ),
                                           )
                                         }
-                                        disabled={
-                                          !log.selectedMethod ||
-                                          !log.selectedRationale?.trim() ||
-                                          methodReviewingLogId === log.id
-                                        }
                                         className={cn(
-                                          "w-full py-3 rounded-xl font-bold text-sm uppercase tracking-[0.14em] transition-all",
-                                          !log.selectedMethod ||
+                                          "w-full bg-white border border-slate-200 rounded-xl py-4 px-5 focus:outline-none focus:border-brand-pink shadow-sm transition-all text-base resize-none min-h-[100px]",
+                                          log.methodStepCompleted &&
+                                            "bg-slate-100 text-slate-600",
+                                        )}
+                                      />
+                                      {!log.methodStepCompleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleTechniqueSelectionMethodSubmit(
+                                              log.id,
+                                            )
+                                          }
+                                          disabled={
+                                            !log.selectedMethod ||
                                             !log.selectedRationale?.trim() ||
                                             methodReviewingLogId === log.id
-                                            ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                            : "gradient-bg text-white shadow-lg shadow-brand-pink/20 hover:scale-[1.01]",
-                                        )}
-                                      >
-                                        {methodReviewingLogId === log.id
-                                          ? "Reviewing..."
-                                          : "Submit Method"}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-
-                              {log.technique === "Technique Selection" &&
-                                log.level === 2 &&
-                                log.methodStepCompleted && (
-                                  <div
-                                    className={cn(
-                                      "p-5 rounded-xl border space-y-4",
-                                      log.methodFeedbackScore?.grade === "green"
-                                        ? "bg-emerald-50 border-emerald-200"
-                                        : log.methodFeedbackScore?.grade ===
-                                            "yellow"
-                                          ? "bg-amber-50 border-amber-200"
-                                          : log.methodFeedbackScore?.grade ===
-                                              "red"
-                                            ? "bg-red-50 border-red-200"
-                                            : "bg-white border-slate-200",
-                                    )}
-                                  >
-                                    <div className="flex items-center justify-between gap-3">
-                                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                                        Method Feedback
-                                      </p>
-                                      {log.methodFeedbackScore && (
-                                        <span
+                                          }
                                           className={cn(
-                                            "px-3 py-1 rounded-full text-xs font-semibold",
-                                            log.methodFeedbackScore.grade ===
-                                              "green"
-                                              ? "bg-emerald-100 text-emerald-700"
-                                              : log.methodFeedbackScore
-                                                    .grade === "yellow"
-                                                ? "bg-amber-100 text-amber-700"
-                                                : "bg-red-100 text-red-700",
+                                            "w-full py-3 rounded-xl font-bold text-sm uppercase tracking-[0.14em] transition-all",
+                                            !log.selectedMethod ||
+                                              !log.selectedRationale?.trim() ||
+                                              methodReviewingLogId === log.id
+                                              ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                              : "gradient-bg text-white shadow-lg shadow-brand-pink/20 hover:scale-[1.01]",
                                           )}
                                         >
-                                          {log.methodFeedbackScore.totalScore}/
-                                          {log.methodFeedbackScore.maxScore}
-                                        </span>
+                                          {methodReviewingLogId === log.id
+                                            ? "Reviewing..."
+                                            : (log.methodSelectionAttempts ??
+                                                  0) === 0
+                                              ? "Submit Method"
+                                              : "Submit final attempt"}
+                                        </button>
                                       )}
                                     </div>
-                                    {log.methodFeedback && (
-                                      <p className="text-base text-slate-700 leading-relaxed">
-                                        {log.methodFeedback}
-                                      </p>
-                                    )}
-                                  </div>
+
+                                    {(log.methodSelectionAttempts ?? 0) >= 1 &&
+                                      log.methodFeedback && (
+                                        <div
+                                          className={cn(
+                                            "p-5 rounded-xl border space-y-4",
+                                            log.methodFeedbackScore?.grade ===
+                                              "green"
+                                              ? "bg-emerald-50 border-emerald-200"
+                                              : log.methodFeedbackScore
+                                                    ?.grade === "yellow"
+                                                ? "bg-amber-50 border-amber-200"
+                                              : log.methodFeedbackScore
+                                                    ?.grade === "red"
+                                                ? "bg-red-50 border-red-200"
+                                                : "bg-white border-slate-200",
+                                          )}
+                                        >
+                                          <div className="flex items-center justify-between gap-3">
+                                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                              Method Feedback
+                                            </p>
+                                            {log.methodFeedbackScore && (
+                                              <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2 shrink-0">
+                                                <span className="text-[11px] font-medium text-slate-600 text-right leading-snug max-w-[12rem] sm:max-w-none">
+                                                  AI-evaluated score for your
+                                                  answer (earned / total
+                                                  points)
+                                                </span>
+                                                <span
+                                                  className={cn(
+                                                    "px-3 py-1 rounded-full text-xs font-semibold tabular-nums",
+                                                    log.methodFeedbackScore
+                                                      .grade === "green"
+                                                      ? "bg-emerald-100 text-emerald-700"
+                                                      : log.methodFeedbackScore
+                                                            .grade === "yellow"
+                                                        ? "bg-amber-100 text-amber-700"
+                                                        : "bg-red-100 text-red-700",
+                                                  )}
+                                                >
+                                                  {
+                                                    log.methodFeedbackScore
+                                                      .totalScore
+                                                  }
+                                                  /
+                                                  {
+                                                    log.methodFeedbackScore
+                                                      .maxScore
+                                                  }
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                          {log.methodFeedback && (
+                                            <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
+                                              {log.methodFeedback}
+                                            </p>
+                                          )}
+                                        </div>
+                                      )}
+                                  </>
                                 )}
 
                               {(log.technique !== "Technique Selection" ||
@@ -2666,9 +2762,9 @@ export default function App() {
                                           Step 2: Write Your Prompt
                                         </p>
                                         <p className="text-sm text-slate-700 leading-relaxed">
-                                          Using the method you selected and the
-                                          feedback above, write your full prompt
-                                          and submit it.
+                                          Based on the method feedback above, use the correct
+                                          prompting technique, write your full
+                                          prompt and submit it.
                                         </p>
                                       </>
                                     )}

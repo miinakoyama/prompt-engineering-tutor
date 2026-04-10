@@ -90,12 +90,14 @@ ${body.selectedRationale}
 EVALUATION CRITERIA:
 ${formatCriteriaList(body.rubric)}
 
+IMPORTANT: The learner will see the reference method and task-level explanations in the app. In the "feedback" field, comment ONLY on the learner's written rationale—how clearly it ties to the task (volume, format, ambiguity, etc.). Do not restate which method is correct or repeat the reference rationale.
+
 Respond with ONLY valid JSON:
 {
   "scores": {
 ${formatScoreTemplate(body.rubric)}
   },
-  "feedback": "2-3 sentences of concise feedback on method choice quality."
+  "feedback": "1-3 sentences on rationale clarity and grounding in the task only."
 }`;
 
       const gradingResponse = await callGeminiWithRetry(gradingPrompt);

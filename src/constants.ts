@@ -698,13 +698,13 @@ Ask whether the core work is **repeating a format** (Few-shot), **one-shot gener
                 text: "A. Zero-shot Prompting: The model can summarize papers instantly.",
                 isCorrect: false,
                 explanation:
-                  "This task requires multi-step comparative reasoning, not a single-pass summary.",
+                  "The correct answer is **C. Chain-of-Thought (CoT)**. Zero-shot can produce a quick summary, but this task needs multi-step comparative reasoning across conflicting abstracts—not a single-pass gloss. CoT makes the model extract opposing claims, compare tensions, and then propose a unified research question.",
               },
               {
                 text: "B. Few-shot Prompting: Two synthesis examples will enforce formal tone.",
                 isCorrect: false,
                 explanation:
-                  "Few-shot helps style consistency, but the core challenge is reasoning through contradictions.",
+                  "The correct answer is **C. Chain-of-Thought (CoT)**. Few-shot can help tone and format, but the hard part here is reasoning through contradictions and mapping disagreements. CoT fits because it forces explicit steps: opposing claims, comparison, then a unified question.",
               },
               {
                 text: "C. Chain-of-Thought (CoT): Extract opposing claims, compare tensions, then propose a unified question.",
@@ -724,6 +724,12 @@ Define **what “constructive” means** and **how you judge High/Medium/Low** i
             referenceMethod: "Few-shot",
             referenceRationale:
               "Few-shot is most efficient and accurate because this is a high-volume, pattern-driven formatting task where consistency is critical across many records.",
+            incorrectMethodFeedback: {
+              "Zero-shot":
+                "A single instruction without parallel input/output examples makes it easy for the model to drift on the exact pipe-delimited shape, column meanings, and how you judge constructive tone across hundreds of different comments.",
+              "Chain-of-Thought":
+                "CoT shines when each answer needs visible multi-step reasoning; here the bottleneck is repeating the same rigid row template at scale. Examples anchor the pattern far more reliably than reasoning steps alone.",
+            },
             referencePrompt:
               "Method: Few-shot\nRationale: High-volume formatting tasks need strict pattern consistency for reliable outputs.\nPrompt:\nYou are an Academic Administrative Assistant. Your task is to process peer feedback for a university course.\nCriteria for Contribution: High = led complex tasks or helped others; Medium = completed assigned tasks; Low = unresponsive or missed deadlines.\nConvert feedback into: Name | Constructive (Y/N) | Contribution | TA Note\nInput: 'Feedback for Sarah: She wrote the entire Python script and helped me debug my part. Very polite.'\nOutput: Sarah | Y | High | Led technical development and supported teammates.\nInput: 'Feedback for Mark: We did not hear from him for two weeks and had to finish his slides.'\nOutput: Mark | Y | Low | Unresponsive for a significant period; group covered his workload.\nInput: [Insert Student Feedback Text Here]\nOutput:",
             rubric: TECHNIQUE_SELECTION_RUBRIC,
@@ -757,13 +763,13 @@ Blame-shifting threads need **structured comparison** of parties and incentives 
                 text: "A. Zero-shot Prompting: The LLM already knows summarization and this is fastest.",
                 isCorrect: false,
                 explanation:
-                  "Fast, but likely to miss subtle conflict dynamics and shifting responsibilities.",
+                  "The correct answer is **C. Chain-of-Thought (CoT)**. Zero-shot may be fast, but blame-shifting threads need structured comparison of who said what and why before a sound recommendation. CoT walks through perspectives, trade-offs, and then a middle-ground solution.",
               },
               {
                 text: "B. Few-shot Prompting: Two examples will match your boss's tone.",
                 isCorrect: false,
                 explanation:
-                  "Tone control helps style, but the core challenge is reasoning through conflicting perspectives.",
+                  "The correct answer is **C. Chain-of-Thought (CoT)**. Few-shot can steer tone, but the real risk here is skipping the reasoning that links conflicting emails to root cause and a balanced fix. CoT is the best fit for that step-by-step analysis.",
               },
               {
                 text: "C. Chain-of-Thought (CoT): Identify perspectives, weigh trade-offs, then synthesize a middle-ground recommendation.",
@@ -783,6 +789,12 @@ State your **target university list** and **fit-score rubric** clearly. Use **fi
             referenceMethod: "Few-shot",
             referenceRationale:
               "Few-shot is best because converting 200 resumes into a strict output format depends on repeatable examples and stable structure.",
+            incorrectMethodFeedback: {
+              "Zero-shot":
+                "One long instruction rarely locks the model onto the exact CSV-style columns, scoring rubric, and labeling style across 200 varied resumes; without worked rows, format and criteria get interpreted inconsistently.",
+              "Chain-of-Thought":
+                "Step-by-step reasoning helps tricky one-off decisions, but this job is bulk extraction into an identical row shape. Parallel full examples teach the repeating pattern better than asking the model to reason through the layout each time.",
+            },
             referencePrompt:
               'Method: Few-shot\nRationale: Processing 200 items into strict CSV-ready structure requires pattern consistency and repeatable labeling.\nPrompt:\nYou are an HR Data Analyst. Screen resumes for the "Senior EdTech Researcher" role.\nTarget Universities: CMU, Stanford, Harvard, MIT, UPenn, Columbia, Cornell, NYU, UC Berkeley, and UW.\nCulture Fit Scoring: 1 (no volunteering), 3 (general volunteering), 5 (leadership in education-related volunteering).\nConvert each resume into: Name | University Match (Y/N) | Fit Score | Reason\nInput: Resume: "Alex Smith. PhD from Stanford. Volunteered as a math tutor for 3 years."\nOutput: Alex Smith | Y | 3 | Stanford is on the target list; volunteering is relevant but not leadership-level.\nInput: Resume: "Jamie Doe. Masters from University of Michigan. No volunteer history."\nOutput: Jamie Doe | N | 1 | University not on target list; no volunteer history provided.\nInput: [Insert Resume Text Here]\nOutput:',
             rubric: TECHNIQUE_SELECTION_RUBRIC,

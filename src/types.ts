@@ -42,6 +42,8 @@ export interface LogEntry {
   selectedMethod?: PromptingMethod;
   selectedRationale?: string;
   methodStepCompleted?: boolean;
+  /** Technique Selection L2 step 1: number of method submissions (max 2). */
+  methodSelectionAttempts?: number;
   methodFeedback?: string;
   methodFeedbackScore?: FeedbackScore;
   isCorrect?: boolean;
@@ -85,6 +87,8 @@ export interface ModuleLevel {
   referencePrompt?: string;
   referenceMethod?: PromptingMethod;
   referenceRationale?: string;
+  /** For Technique Selection L2: why each non-reference method is a poor fit for this task. */
+  incorrectMethodFeedback?: Partial<Record<PromptingMethod, string>>;
   rubric?: Rubric;
 }
 

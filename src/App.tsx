@@ -232,6 +232,7 @@ export default function App() {
     string | null
   >(null);
   const [focusLogId, setFocusLogId] = useState<string | null>(null);
+  const [bottomFocusLogId, setBottomFocusLogId] = useState<string | null>(null);
   const [pretestAnswers, setPretestAnswers] = useState<AssessmentAnswers>(
     createEmptyAssessmentAnswers(),
   );
@@ -343,6 +344,22 @@ export default function App() {
       setFocusLogId(null);
     });
   }, [focusLogId, logs]);
+
+  useEffect(() => {
+    if (!bottomFocusLogId) {
+      return;
+    }
+
+    const element = document.getElementById(`log-${bottomFocusLogId}`);
+    if (!element) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: "smooth", block: "end" });
+      setBottomFocusLogId(null);
+    });
+  }, [bottomFocusLogId, logs]);
 
   const isAssessmentComplete = (
     tasks: AssessmentTask[],
@@ -605,7 +622,11 @@ export default function App() {
       task: levelData.task,
     });
 
-    setFocusLogId(logId);
+    if (level === 2) {
+      setBottomFocusLogId(logId);
+    } else {
+      setFocusLogId(logId);
+    }
     setQuestionStartedAt((prev) => ({
       ...prev,
       [`learning-${currentTechnique}-${level}`]: Date.now(),
@@ -754,12 +775,13 @@ export default function App() {
       }),
     );
 
-    addLog({
+    const reviewLogId = addLog({
       type: "review",
       content: `**${choice.isCorrect ? "Correct" : "Not quite"}**\n\n${choice.explanation}`,
       isCorrect: choice.isCorrect,
       reviewType: "choice",
     });
+    setFocusLogId(reviewLogId);
 
     const questionKey = isTsL1
       ? `learning-${currentTechnique}-${currentLevel}-mcq-${nextMcqAttempt}`
@@ -812,15 +834,17 @@ export default function App() {
       return;
     }
 
-    const module = MODULES.find((item) => item.id === currentTechnique)!;
-    const instructionLogId = addLog({
-      type: "intro",
-      content: module.byPersona[background].instruction,
-    });
-    setFocusLogId(instructionLogId);
-
     const nextLevel = (currentLevel + 1) as Level;
-    if (nextLevel <= 2) {
+    if (nextLevel <= 3) {
+      if (currentLevel === 1) {
+        // Show the technique instruction only once, after Level 1
+        const module = MODULES.find((item) => item.id === currentTechnique)!;
+        const instructionLogId = addLog({
+          type: "intro",
+          content: module.byPersona[background].instruction,
+        });
+        setFocusLogId(instructionLogId);
+      }
       setPendingAction({ kind: "level", level: nextLevel });
     }
   };
@@ -842,7 +866,7 @@ export default function App() {
     const activeLevel = currentLevel;
     const isTsL2 =
       targetLog?.technique === "Technique Selection" &&
-      targetLog?.level === 2;
+      targetLog?.level === 3;
     const prevPromptAttempts = targetLog?.promptAttempts ?? 0;
 
     if (isTsL2 && prevPromptAttempts >= 2) {
@@ -1139,7 +1163,7 @@ export default function App() {
     }
 
     const module = MODULES.find((item) => item.id === targetLog.technique)!;
-    const levelData = module.byPersona[background].levels[targetLog.level || 2];
+    const levelData = module.byPersona[background].levels[targetLog.level || 3];
 
     setMethodReviewingLogId(logId);
     try {
@@ -1416,7 +1440,7 @@ export default function App() {
     (sum, levels) => sum + levels.length,
     0,
   );
-  const totalExerciseCount = MODULES.length * 2;
+  const totalExerciseCount = MODULES.length * 3;
   const progressPercent = (completedExerciseCount / totalExerciseCount) * 100;
 
   const getPendingActionLabel = () => {
@@ -1427,6 +1451,7 @@ export default function App() {
     if (pendingAction.kind === "level") {
       return `Continue to Level ${pendingAction.level}`;
     }
+
 
     if (pendingAction.kind === "module") {
       return `Start ${pendingAction.technique}`;
@@ -1470,7 +1495,7 @@ export default function App() {
             >
               <div className="flex items-center gap-3">
                 <div className="flex gap-1">
-                  {[1, 2].map((level) => {
+                  {[1, 2, 3].map((level) => {
                     const typedLevel = level as Level;
                     const isComplete = completed.includes(typedLevel);
                     const isCurrentStep =
@@ -1499,7 +1524,7 @@ export default function App() {
                 >
                   {module.id}
                 </p>
-                {completed.length === 2 && (
+                {completed.length === 3 && (
                   <span className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-600">
                     ✓
                   </span>
@@ -1931,7 +1956,7 @@ export default function App() {
     const sessions = adminData?.sessions || [];
     const pendingAttempts = adminData?.pendingAttempts || [];
     const attempts = adminData?.attempts || [];
-    const matchesEnvFilter = (row: { app_env?: string }) => {
+    const matchesEnvFilter = (row: { app_env?: string | null }) => {
       if (adminEnvFilter === "all") {
         return true;
       }
@@ -1964,7 +1989,7 @@ export default function App() {
       },
       {} as Record<string, AdminAttemptRow[]>,
     );
-    const totalLearningSteps = MODULES.length * 2;
+    const totalLearningSteps = MODULES.length * 3;
     const getPhaseGradeStatus = (
       attemptsForSession: AdminAttemptRow[],
       phase: "pretest" | "posttest",
@@ -2656,7 +2681,7 @@ export default function App() {
                                   </p>
                                 )}
                               {log.technique === "Technique Selection" &&
-                                log.level === 2 && (
+                                log.level === 3 && (
                                   <div className="space-y-1 text-sm font-medium text-slate-600 normal-case tracking-normal">
                                     <p>
                                       Step 1 (method selection) allows a
@@ -2791,6 +2816,96 @@ export default function App() {
                             );
                           })()}
 
+                          {log.level === 2 && (() => {
+                            const levelData = MODULES.find(
+                              (m) => m.id === log.technique,
+                            )?.byPersona[background].levels[2];
+                            if (!levelData?.choices) return null;
+                            const hasSelection = !!log.selectedChoice;
+                            const showCorrect = hasSelection && !log.isCorrect;
+                            return (
+                              <div className="mt-6 space-y-4">
+                                {levelData.diagnosticPrompt && (
+                                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70">
+                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400 mb-3">
+                                      Sample Prompt
+                                    </p>
+                                    <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono leading-relaxed">
+                                      {levelData.diagnosticPrompt}
+                                    </pre>
+                                  </div>
+                                )}
+                                {levelData.choices.map((choice, idx) => {
+                                  const isSelected =
+                                    log.selectedChoice === choice.text;
+                                  const locked = hasSelection;
+                                  const revealCorrect =
+                                    showCorrect && choice.isCorrect;
+                                  return (
+                                    <button
+                                      key={idx}
+                                      disabled={locked}
+                                      onClick={() =>
+                                        handleChoiceSelect(choice, log.id)
+                                      }
+                                      className={cn(
+                                        "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
+                                        !hasSelection
+                                          ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
+                                          : isSelected
+                                            ? choice.isCorrect
+                                              ? "bg-emerald-50 border-emerald-200"
+                                              : "bg-red-50 border-red-200"
+                                            : revealCorrect
+                                              ? "bg-emerald-50 border-emerald-200"
+                                              : "bg-slate-50 border-slate-100 opacity-50",
+                                      )}
+                                    >
+                                      <div className="flex items-start gap-4">
+                                        <div
+                                          className={cn(
+                                            "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
+                                            !hasSelection
+                                              ? "border-slate-200 group-hover:border-brand-pink"
+                                              : isSelected
+                                                ? choice.isCorrect
+                                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                                  : "border-red-500 bg-red-500 text-white"
+                                                : revealCorrect
+                                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                                  : "border-slate-200",
+                                          )}
+                                        >
+                                          {isSelected
+                                            ? choice.isCorrect
+                                              ? "✓"
+                                              : "×"
+                                            : revealCorrect
+                                              ? "✓"
+                                              : null}
+                                        </div>
+                                        <p
+                                          className={cn(
+                                            "text-base leading-relaxed",
+                                            isSelected
+                                              ? choice.isCorrect
+                                                ? "text-emerald-900"
+                                                : "text-red-900"
+                                              : revealCorrect
+                                                ? "text-emerald-900"
+                                                : "text-slate-700",
+                                          )}
+                                        >
+                                          {choice.text}
+                                        </p>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+
                           {log.level === 1 && (
                             <div className="mt-12 space-y-4">
                               {log.technique === "Technique Selection" &&
@@ -2820,6 +2935,8 @@ export default function App() {
                                   const isSelected =
                                     log.selectedChoice === choice.text;
                                   const hasSelection = !!log.selectedChoice;
+                                  const showCorrect = choiceLocked && !log.isCorrect;
+                                  const revealCorrect = showCorrect && choice.isCorrect && !isSelected;
 
                                   return (
                                     <button
@@ -2836,7 +2953,9 @@ export default function App() {
                                             ? choice.isCorrect
                                               ? "bg-emerald-50 border-emerald-200"
                                               : "bg-red-50 border-red-200"
-                                            : "bg-slate-50 border-slate-100 opacity-50",
+                                            : revealCorrect
+                                              ? "bg-emerald-50 border-emerald-200"
+                                              : "bg-slate-50 border-slate-100 opacity-50",
                                       )}
                                     >
                                       <div className="flex items-start gap-4">
@@ -2849,14 +2968,18 @@ export default function App() {
                                                 ? choice.isCorrect
                                                   ? "border-emerald-500 bg-emerald-500 text-white"
                                                   : "border-red-500 bg-red-500 text-white"
-                                                : "border-slate-200",
+                                                : revealCorrect
+                                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                                  : "border-slate-200",
                                           )}
                                         >
                                           {isSelected
                                             ? choice.isCorrect
                                               ? "✓"
                                               : "×"
-                                            : null}
+                                            : revealCorrect
+                                              ? "✓"
+                                              : null}
                                         </div>
                                         <p
                                           className={cn(
@@ -2865,7 +2988,9 @@ export default function App() {
                                               ? choice.isCorrect
                                                 ? "text-emerald-900"
                                                 : "text-red-900"
-                                              : "text-slate-700",
+                                              : revealCorrect
+                                                ? "text-emerald-900"
+                                                : "text-slate-700",
                                           )}
                                         >
                                           {choice.text}
@@ -2908,10 +3033,10 @@ export default function App() {
                             </div>
                           )}
 
-                          {log.level && log.level >= 2 && (
+                          {log.level && log.level >= 3 && (
                             <div className="mt-12 space-y-5">
                               {log.technique === "Technique Selection" &&
-                                log.level === 2 && (
+                                log.level === 3 && (
                                   <>
                                     <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
                                       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
@@ -3084,19 +3209,19 @@ export default function App() {
                                 )}
 
                               {(log.technique !== "Technique Selection" ||
-                                log.level !== 2 ||
+                                log.level !== 3 ||
                                 log.methodStepCompleted) && (
                                 <div
                                   className={cn(
                                     "space-y-3",
                                     log.technique === "Technique Selection" &&
-                                      log.level === 2 &&
+                                      log.level === 3 &&
                                       log.methodStepCompleted &&
                                       "p-5 rounded-xl border border-slate-200 bg-slate-50/70",
                                   )}
                                 >
                                   {log.technique === "Technique Selection" &&
-                                    log.level === 2 &&
+                                    log.level === 3 &&
                                     log.methodStepCompleted && (
                                       <>
                                         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
@@ -3170,7 +3295,7 @@ export default function App() {
                                     )}
                                   </div>
                                   {log.technique === "Technique Selection" &&
-                                    log.level === 2 &&
+                                    log.level === 3 &&
                                     log.methodStepCompleted &&
                                     (log.promptAttempts ?? 0) >= 1 &&
                                     log.promptStepFeedback && (

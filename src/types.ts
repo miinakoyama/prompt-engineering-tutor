@@ -4,7 +4,7 @@ export type Technique = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought' | 'Techniq
 
 export type PromptingMethod = 'Zero-shot' | 'Few-shot' | 'Chain-of-Thought';
 
-export type Level = 1 | 2;
+export type Level = 1 | 2 | 3;
 
 export type FlowStage = 'pretest' | 'learning' | 'posttest' | 'done';
 
@@ -98,9 +98,11 @@ export interface ModuleLevel {
   referencePrompt?: string;
   referenceMethod?: PromptingMethod;
   referenceRationale?: string;
-  /** For Technique Selection L2: why each non-reference method is a poor fit for this task. */
+  /** For Technique Selection L3: why each non-reference method is a poor fit for this task. */
   incorrectMethodFeedback?: Partial<Record<PromptingMethod, string>>;
   rubric?: Rubric;
+  /** For Level 2 diagnostic MCQ: the sample prompt learners analyze to identify a missing criterion. */
+  diagnosticPrompt?: string;
 }
 
 export interface ModuleContent {

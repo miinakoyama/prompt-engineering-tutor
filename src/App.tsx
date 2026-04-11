@@ -3193,6 +3193,59 @@ export default function App() {
                                               </div>
                                             )}
                                           </div>
+                                          {log.methodFeedbackScore && (
+                                            <div className="space-y-2">
+                                              {log.methodFeedbackScore.criteriaScores.some(
+                                                (c) => c.score === 1,
+                                              ) && (
+                                                <div className="flex flex-wrap gap-2">
+                                                  {log.methodFeedbackScore.criteriaScores
+                                                    .filter((c) => c.score === 1)
+                                                    .map((c) => (
+                                                      <span
+                                                        key={c.id}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100"
+                                                      >
+                                                        <span className="text-emerald-600 text-sm font-bold">
+                                                          ✓
+                                                        </span>
+                                                        <span className="text-sm font-medium text-emerald-700">
+                                                          {c.label}
+                                                        </span>
+                                                      </span>
+                                                    ))}
+                                                </div>
+                                              )}
+                                              {log.methodFeedbackScore.criteriaScores.some(
+                                                (c) => c.score === 0,
+                                              ) && (
+                                                <div className="space-y-1.5">
+                                                  {log.methodFeedbackScore.criteriaScores
+                                                    .filter((c) => c.score === 0)
+                                                    .map((c) => (
+                                                      <div
+                                                        key={c.id}
+                                                        className="flex gap-3 items-start px-3 py-2.5 rounded-lg bg-red-50 border border-red-100"
+                                                      >
+                                                        <span className="text-red-500 text-sm font-bold mt-0.5 shrink-0">
+                                                          ✗
+                                                        </span>
+                                                        <div>
+                                                          <p className="text-sm font-semibold text-red-700">
+                                                            {c.label}
+                                                          </p>
+                                                          {c.reason && (
+                                                            <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                                                              {c.reason}
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                           {log.methodFeedback && (
                                             <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                               {log.methodFeedback}
@@ -3349,6 +3402,59 @@ export default function App() {
                                             </div>
                                           )}
                                         </div>
+                                        {log.promptStepFeedbackScore && (
+                                          <div className="space-y-2">
+                                            {log.promptStepFeedbackScore.criteriaScores.some(
+                                              (c) => c.score === 1,
+                                            ) && (
+                                              <div className="flex flex-wrap gap-2">
+                                                {log.promptStepFeedbackScore.criteriaScores
+                                                  .filter((c) => c.score === 1)
+                                                  .map((c) => (
+                                                    <span
+                                                      key={c.id}
+                                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100"
+                                                    >
+                                                      <span className="text-emerald-600 text-sm font-bold">
+                                                        ✓
+                                                      </span>
+                                                      <span className="text-sm font-medium text-emerald-700">
+                                                        {c.label}
+                                                      </span>
+                                                    </span>
+                                                  ))}
+                                              </div>
+                                            )}
+                                            {log.promptStepFeedbackScore.criteriaScores.some(
+                                              (c) => c.score === 0,
+                                            ) && (
+                                              <div className="space-y-1.5">
+                                                {log.promptStepFeedbackScore.criteriaScores
+                                                  .filter((c) => c.score === 0)
+                                                  .map((c) => (
+                                                    <div
+                                                      key={c.id}
+                                                      className="flex gap-3 items-start px-3 py-2.5 rounded-lg bg-red-50 border border-red-100"
+                                                    >
+                                                      <span className="text-red-500 text-sm font-bold mt-0.5 shrink-0">
+                                                        ✗
+                                                      </span>
+                                                      <div>
+                                                        <p className="text-sm font-semibold text-red-700">
+                                                          {c.label}
+                                                        </p>
+                                                        {c.reason && (
+                                                          <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                                                            {c.reason}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                         <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                           {log.promptStepFeedback}
                                         </p>
@@ -3512,40 +3618,55 @@ export default function App() {
                               </div>
 
                               {log.feedbackScore && (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {log.feedbackScore.criteriaScores.map(
-                                    (criterion) => (
-                                      <div
-                                        key={criterion.id}
-                                        className={cn(
-                                          "px-3 py-2 rounded-lg flex items-center gap-2",
-                                          criterion.score === 1
-                                            ? "bg-emerald-50"
-                                            : "bg-red-50",
-                                        )}
-                                      >
-                                        <span
-                                          className={cn(
-                                            "text-sm font-bold",
-                                            criterion.score === 1
-                                              ? "text-emerald-600"
-                                              : "text-red-500",
-                                          )}
-                                        >
-                                          {criterion.score === 1 ? "✓" : "✗"}
-                                        </span>
-                                        <span
-                                          className={cn(
-                                            "text-sm font-medium",
-                                            criterion.score === 1
-                                              ? "text-emerald-700"
-                                              : "text-red-700",
-                                          )}
-                                        >
-                                          {criterion.label}
-                                        </span>
-                                      </div>
-                                    ),
+                                <div className="space-y-2">
+                                  {log.feedbackScore.criteriaScores.some(
+                                    (c) => c.score === 1,
+                                  ) && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {log.feedbackScore.criteriaScores
+                                        .filter((c) => c.score === 1)
+                                        .map((c) => (
+                                          <span
+                                            key={c.id}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100"
+                                          >
+                                            <span className="text-emerald-600 text-sm font-bold">
+                                              ✓
+                                            </span>
+                                            <span className="text-sm font-medium text-emerald-700">
+                                              {c.label}
+                                            </span>
+                                          </span>
+                                        ))}
+                                    </div>
+                                  )}
+                                  {log.feedbackScore.criteriaScores.some(
+                                    (c) => c.score === 0,
+                                  ) && (
+                                    <div className="space-y-1.5">
+                                      {log.feedbackScore.criteriaScores
+                                        .filter((c) => c.score === 0)
+                                        .map((c) => (
+                                          <div
+                                            key={c.id}
+                                            className="flex gap-3 items-start px-3 py-2.5 rounded-lg bg-red-50 border border-red-100"
+                                          >
+                                            <span className="text-red-500 text-sm font-bold mt-0.5 shrink-0">
+                                              ✗
+                                            </span>
+                                            <div>
+                                              <p className="text-sm font-semibold text-red-700">
+                                                {c.label}
+                                              </p>
+                                              {c.reason && (
+                                                <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                                                  {c.reason}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
                                   )}
                                 </div>
                               )}

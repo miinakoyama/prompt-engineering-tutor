@@ -310,20 +310,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       );
       const usernameBySessionId: Record<string, string> = (filteredSessions || []).reduce(
         (acc: Record<string, string>, session) => {
-          const usernameKey = String(session.student_username || "").trim().toLowerCase();
-          if (usernameKey) {
-            acc[session.id] = usernameKey;
-          }
+          const usernameKey =
+            String(session.student_username || "").trim().toLowerCase() || "unknown";
+          acc[session.id] = usernameKey;
           return acc;
         },
         {} as Record<string, string>,
       );
       const attemptsByUser: Record<string, number> = (filteredAttempts || []).reduce(
         (acc: Record<string, number>, attempt) => {
-          const usernameKey = usernameBySessionId[attempt.session_id];
-          if (!usernameKey) {
-            return acc;
-          }
+          const usernameKey = usernameBySessionId[attempt.session_id] || "unknown";
           acc[usernameKey] = (acc[usernameKey] || 0) + 1;
           return acc;
         },
@@ -348,7 +344,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         const row: Record<string, unknown> = {
           app_env: session.app_env,
           student_username: displayUsername,
-          session_count_for_username: sessionsByUser[usernameKey]?.length || 1,
+          session_count_for_username_in_export: sessionsByUser[usernameKey]?.length || 1,
           session_id: session.id,
           started_at: session.started_at,
           background: session.background,
@@ -375,7 +371,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           posttest_failed_count: posttest.failed,
           learning_steps_completed: learningStepsCompleted,
           attempts_total_for_session: sessionAttempts.length,
-          attempts_total_all_sessions_for_username: attemptsByUser[usernameKey] || 0,
+          attempts_total_all_sessions_for_username_in_export: attemptsByUser[usernameKey] || 0,
           pretest_duration_sec: session.pretest_duration_sec,
           posttest_duration_sec: session.posttest_duration_sec,
           course_duration_sec: session.course_duration_sec,

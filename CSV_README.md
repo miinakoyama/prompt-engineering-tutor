@@ -9,7 +9,7 @@ The export is now one row per session (`session_id`), so the same `student_usern
 | --- | --- |
 | `app_env` | Environment for the session (`local`, `production`, etc.). |
 | `student_username` | Username entered in that session. |
-| `session_count_for_username` | Number of sessions found for the same username. |
+| `session_count_for_username_in_export` | Number of sessions for the same username within this export (bounded by the export limit). |
 | `session_id` | Session ID for this row. |
 | `started_at` | Session start timestamp. |
 | `background` | Selected background/persona in this session. |
@@ -46,7 +46,7 @@ The export is now one row per session (`session_id`), so the same `student_usern
 | --- | --- |
 | `learning_steps_completed` | Number of unique learning steps completed in this session. |
 | `attempts_total_for_session` | Total number of attempts in this session. |
-| `attempts_total_all_sessions_for_username` | Total number of attempts across all sessions for this username. |
+| `attempts_total_all_sessions_for_username_in_export` | Total number of attempts across all sessions for this username within this export (bounded by the export limit). |
 | `pretest_duration_sec` | Total pretest duration in seconds for this session. |
 | `posttest_duration_sec` | Total posttest duration in seconds for this session. |
 | `course_duration_sec` | Total course duration in seconds for this session. |

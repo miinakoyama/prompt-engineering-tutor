@@ -52,6 +52,96 @@ function parseTimestamp(value: unknown) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function getPhaseSortOrder(phase: unknown) {
+  const normalized = String(phase || "").toLowerCase();
+  if (normalized === "pretest") return 0;
+  if (normalized === "learning") return 1;
+  if (normalized === "posttest") return 2;
+  return 3;
+}
+
+function normalizeSortText(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+}
+
+function extractLearningTechnique(attempt: any) {
+  const questionKey = String(attempt?.question_key || "");
+  const match = questionKey.match(/^learning-(.+?)-\d+(?:-.+)?$/i);
+  if (match?.[1]) {
+    return match[1];
+  }
+  const questionTitle = String(attempt?.question_title || "");
+  if (questionTitle.toLowerCase().includes("zero-shot")) return "Zero-shot";
+  if (questionTitle.toLowerCase().includes("few-shot")) return "Few-shot";
+  if (questionTitle.toLowerCase().includes("chain-of-thought")) return "Chain-of-Thought";
+  if (questionTitle.toLowerCase().includes("technique selection")) return "Technique Selection";
+  return "";
+}
+
+function getLearningTechniqueSortOrder(attempt: any) {
+  const normalized = normalizeSortText(extractLearningTechnique(attempt));
+  if (normalized.includes("zero-shot")) return 0;
+  if (normalized.includes("few-shot")) return 1;
+  if (normalized.includes("chain-of-thought")) return 2;
+  if (normalized.includes("technique-selection")) return 3;
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function getQuestionNumberForSort(attempt: any) {
+  const questionKey = String(attempt?.question_key || "");
+  const questionTitle = String(attempt?.question_title || "");
+  const keyMatch = questionKey.match(/(\d+)(?!.*\d)/);
+  if (keyMatch) {
+    return Number(keyMatch[1]);
+  }
+  const titleMatch = questionTitle.match(/(\d+)(?!.*\d)/);
+  if (titleMatch) {
+    return Number(titleMatch[1]);
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function getLatestAttemptByPhaseAndQuestion(attempts: any[]) {
+  const latestByPhaseQuestion = new Map<string, any>();
+  for (const attempt of attempts) {
+    const phase = String(attempt.phase || "");
+    const questionKey = String(attempt.question_key || "");
+    const mapKey = `${phase}::${questionKey}`;
+    const existing = latestByPhaseQuestion.get(mapKey);
+    if (!existing || parseTimestamp(attempt.submitted_at) > parseTimestamp(existing.submitted_at)) {
+      latestByPhaseQuestion.set(mapKey, attempt);
+    }
+  }
+  return Array.from(latestByPhaseQuestion.values());
+}
+
+function compareAttemptsForCsv(a: any, b: any) {
+  const phaseDiff = getPhaseSortOrder(a.phase) - getPhaseSortOrder(b.phase);
+  if (phaseDiff !== 0) {
+    return phaseDiff;
+  }
+  if (String(a.phase || "").toLowerCase() === "learning") {
+    const techniqueDiff =
+      getLearningTechniqueSortOrder(a) - getLearningTechniqueSortOrder(b);
+    if (techniqueDiff !== 0) {
+      return techniqueDiff;
+    }
+  }
+  const questionNumberDiff = getQuestionNumberForSort(a) - getQuestionNumberForSort(b);
+  if (questionNumberDiff !== 0) {
+    return questionNumberDiff;
+  }
+  const keyDiff = String(a.question_key || "").localeCompare(String(b.question_key || ""));
+  if (keyDiff !== 0) {
+    return keyDiff;
+  }
+  // Keep latest first if everything else is the same.
+  return parseTimestamp(b.submitted_at) - parseTimestamp(a.submitted_at);
+}
+
 function getLatestAttemptByQuestion(attempts: any[], phase: "pretest" | "posttest") {
   const latestByQuestion = new Map<string, any>();
   for (const attempt of attempts) {
@@ -208,72 +298,89 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
       const sessionsByUser: Record<string, any[]> = (filteredSessions || []).reduce(
         (acc: Record<string, any[]>, session) => {
-          const username = String(session.student_username || "").trim().toLowerCase() || "unknown";
-          if (!acc[username]) {
-            acc[username] = [];
+          const usernameKey =
+            String(session.student_username || "").trim().toLowerCase() || "unknown";
+          if (!acc[usernameKey]) {
+            acc[usernameKey] = [];
           }
-          acc[username].push(session);
+          acc[usernameKey].push(session);
           return acc;
         },
         {} as Record<string, any[]>,
       );
+      const usernameBySessionId: Record<string, string> = (filteredSessions || []).reduce(
+        (acc: Record<string, string>, session) => {
+          const usernameKey =
+            String(session.student_username || "").trim().toLowerCase() || "unknown";
+          acc[session.id] = usernameKey;
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
+      const attemptsByUser: Record<string, number> = (filteredAttempts || []).reduce(
+        (acc: Record<string, number>, attempt) => {
+          const usernameKey = usernameBySessionId[attempt.session_id] || "unknown";
+          acc[usernameKey] = (acc[usernameKey] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
-      const userRows = Object.entries(sessionsByUser).map(([username, userSessions]) => {
-        const sortedSessions = [...userSessions].sort(
-          (a, b) => parseTimestamp(b.started_at) - parseTimestamp(a.started_at),
-        );
-        const latestSession = sortedSessions[0];
-        const userSessionIds = new Set(sortedSessions.map((session) => session.id));
-        const attemptsAllSessions = (filteredAttempts || []).filter((attempt) =>
-          userSessionIds.has(attempt.session_id),
-        );
-        const latestSessionAttempts = attemptsBySessionId[latestSession.id] || [];
+      const sessionsSorted = [...(filteredSessions || [])].sort(
+        (a, b) => parseTimestamp(b.started_at) - parseTimestamp(a.started_at),
+      );
+      const sessionRows = sessionsSorted.map((session) => {
+        const usernameKey = String(session.student_username || "").trim().toLowerCase() || "unknown";
+        const displayUsername = String(session.student_username || "").trim() || "unknown";
+        const sessionAttempts = attemptsBySessionId[session.id] || [];
 
-        const pretest = summarizePhase(latestSessionAttempts, "pretest");
-        const posttest = summarizePhase(latestSessionAttempts, "posttest");
-        const latestLearningAttempts = latestSessionAttempts.filter(
-          (attempt) => attempt.phase === "learning",
-        );
+        const pretest = summarizePhase(sessionAttempts, "pretest");
+        const posttest = summarizePhase(sessionAttempts, "posttest");
+        const learningAttempts = sessionAttempts.filter((attempt) => attempt.phase === "learning");
         const learningStepsCompleted = new Set(
-          latestLearningAttempts.map((attempt) => attempt.question_key).filter(Boolean),
+          learningAttempts.map((attempt) => attempt.question_key).filter(Boolean),
         ).size;
 
         const row: Record<string, unknown> = {
-          app_env_latest: latestSession.app_env,
-          student_username: username,
-          session_count: sortedSessions.length,
-          latest_session_id: latestSession.id,
-          latest_started_at: latestSession.started_at,
-          background_latest: latestSession.background,
-          flow_stage_latest: latestSession.flow_stage,
-          pretest_completed_at_latest: latestSession.pretest_completed_at,
-          posttest_completed_at_latest: latestSession.posttest_completed_at,
-          completed_at_latest: latestSession.completed_at,
-          pretest_experience_level_latest: latestSession.pretest_experience_level,
-          pretest_confidence_latest: latestSession.pretest_confidence,
-          posttest_confidence_latest: latestSession.posttest_confidence,
-          pretest_questions_latest: pretest.questionCount,
-          pretest_score_total_latest: pretest.scoreTotal,
-          pretest_score_max_latest: pretest.scoreMax,
-          pretest_score_pct_latest: pretest.scorePct,
-          pretest_graded_count_latest: pretest.graded,
-          pretest_pending_count_latest: pretest.pending,
-          pretest_failed_count_latest: pretest.failed,
-          posttest_questions_latest: posttest.questionCount,
-          posttest_score_total_latest: posttest.scoreTotal,
-          posttest_score_max_latest: posttest.scoreMax,
-          posttest_score_pct_latest: posttest.scorePct,
-          posttest_graded_count_latest: posttest.graded,
-          posttest_pending_count_latest: posttest.pending,
-          posttest_failed_count_latest: posttest.failed,
-          learning_steps_completed_latest: learningStepsCompleted,
-          attempts_total_all_sessions: attemptsAllSessions.length,
-          pretest_duration_sec_latest: latestSession.pretest_duration_sec,
-          posttest_duration_sec_latest: latestSession.posttest_duration_sec,
-          course_duration_sec_latest: latestSession.course_duration_sec,
+          app_env: session.app_env,
+          student_username: displayUsername,
+          session_count_for_username_in_export: sessionsByUser[usernameKey]?.length || 1,
+          session_id: session.id,
+          started_at: session.started_at,
+          background: session.background,
+          flow_stage: session.flow_stage,
+          pretest_completed_at: session.pretest_completed_at,
+          posttest_completed_at: session.posttest_completed_at,
+          completed_at: session.completed_at,
+          pretest_experience_level: session.pretest_experience_level,
+          pretest_confidence: session.pretest_confidence,
+          posttest_confidence: session.posttest_confidence,
+          pretest_questions: pretest.questionCount,
+          pretest_score_total: pretest.scoreTotal,
+          pretest_score_max: pretest.scoreMax,
+          pretest_score_pct: pretest.scorePct,
+          pretest_graded_count: pretest.graded,
+          pretest_pending_count: pretest.pending,
+          pretest_failed_count: pretest.failed,
+          posttest_questions: posttest.questionCount,
+          posttest_score_total: posttest.scoreTotal,
+          posttest_score_max: posttest.scoreMax,
+          posttest_score_pct: posttest.scorePct,
+          posttest_graded_count: posttest.graded,
+          posttest_pending_count: posttest.pending,
+          posttest_failed_count: posttest.failed,
+          learning_steps_completed: learningStepsCompleted,
+          attempts_total_for_session: sessionAttempts.length,
+          attempts_total_all_sessions_for_username_in_export: attemptsByUser[usernameKey] || 0,
+          pretest_duration_sec: session.pretest_duration_sec,
+          posttest_duration_sec: session.posttest_duration_sec,
+          course_duration_sec: session.course_duration_sec,
         };
 
-        for (const attempt of latestSessionAttempts) {
+        const latestAttemptsByQuestion = getLatestAttemptByPhaseAndQuestion(sessionAttempts).sort(
+          compareAttemptsForCsv,
+        );
+        for (const attempt of latestAttemptsByQuestion) {
           const questionKey = String(attempt.question_key || "unknown");
           const prefix = `q_${toColumnKey(questionKey)}`;
           row[`${prefix}_phase`] = attempt.phase;
@@ -308,11 +415,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return row;
       });
 
-      const csv = toCsvRows(userRows);
+      const csv = toCsvRows(sessionRows);
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="prompt-mentor-users-${Date.now()}.csv"`,
+        `attachment; filename="prompt-mentor-sessions-${Date.now()}.csv"`,
       );
       if (typeof res.send === "function") {
         res.status(200);

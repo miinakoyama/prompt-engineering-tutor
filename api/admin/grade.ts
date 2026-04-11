@@ -200,7 +200,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         "id,question_key,phase,prompt_raw,selected_choice,selected_method,selected_rationale",
       )
       .in("phase", ["pretest", "posttest"])
-      .eq("grading_status", "pending")
+      // Include failed rows so "Needs retry" can be re-graded from admin.
+      .in("grading_status", ["pending", "failed"])
       .order("submitted_at", { ascending: true });
     if (appEnvFilter) {
       attemptsQuery = attemptsQuery.eq("app_env", appEnvFilter);

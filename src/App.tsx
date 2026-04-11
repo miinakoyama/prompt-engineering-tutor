@@ -864,12 +864,12 @@ export default function App() {
 
     const activeTechnique = currentTechnique;
     const activeLevel = currentLevel;
-    const isTsL2 =
+    const isTsL3 =
       targetLog?.technique === "Technique Selection" &&
       targetLog?.level === 3;
     const prevPromptAttempts = targetLog?.promptAttempts ?? 0;
 
-    if (isTsL2 && prevPromptAttempts >= 2) {
+    if (isTsL3 && prevPromptAttempts >= 2) {
       return;
     }
 
@@ -877,7 +877,7 @@ export default function App() {
     const moduleContent = module.byPersona[background];
     const levelTask = moduleContent.levels[activeLevel].task;
 
-    if (!isTsL2) {
+    if (!isTsL3) {
       setLogs((prev) =>
         prev.map((log) => {
           if (log.id === logId) {
@@ -919,9 +919,9 @@ export default function App() {
       const nextPromptAttempt = prevPromptAttempts + 1;
       const isFullyCorrect = feedbackScore?.grade === "green";
       const promptCompleteNow =
-        !isTsL2 || isFullyCorrect || nextPromptAttempt >= 2;
+        !isTsL3 || isFullyCorrect || nextPromptAttempt >= 2;
 
-      if (isTsL2 && !promptCompleteNow) {
+      if (isTsL3 && !promptCompleteNow) {
         const promptStepRetryHint =
           "Revise your prompt based on the feedback below and submit one more time.";
         const feedbackTextForSave = [feedbackText, promptStepRetryHint]
@@ -994,7 +994,7 @@ export default function App() {
       }
 
       const reviewContent =
-        isTsL2 &&
+        isTsL3 &&
         nextPromptAttempt >= 2 &&
         !isFullyCorrect &&
         feedbackText
@@ -1007,7 +1007,7 @@ export default function App() {
             ? {
                 ...log,
                 submittedPrompt: prompt,
-                ...(isTsL2
+                ...(isTsL3
                   ? {
                       promptAttempts: nextPromptAttempt,
                       promptStepFeedback: undefined,
@@ -1038,7 +1038,7 @@ export default function App() {
       setIsWaitingForResult(false);
 
       markLevelComplete(activeTechnique, activeLevel);
-      const questionKey = isTsL2
+      const questionKey = isTsL3
         ? `learning-${activeTechnique}-${activeLevel}-prompt-${nextPromptAttempt}`
         : `learning-${activeTechnique}-${activeLevel}`;
       const startedAt = questionStartedAt[
@@ -1065,7 +1065,7 @@ export default function App() {
           selectedMethod: selectedMethod,
           selectedRationale: targetLog?.selectedRationale,
           criteriaScores: feedbackScore?.criteriaScores,
-          ...(isTsL2
+          ...(isTsL3
             ? {
                 metadata: {
                   stage: "technique_selection_prompt",
@@ -1083,7 +1083,7 @@ export default function App() {
             durationSec,
             totalScore: feedbackScore?.totalScore,
             maxScore: feedbackScore?.maxScore,
-            ...(isTsL2
+            ...(isTsL3
               ? {
                   attempt: nextPromptAttempt,
                   stepCompleted: true,
@@ -1452,12 +1452,84 @@ export default function App() {
       return `Continue to Level ${pendingAction.level}`;
     }
 
-
     if (pendingAction.kind === "module") {
       return `Start ${pendingAction.technique}`;
     }
 
     return "Go to Post-Test";
+  };
+
+  const renderMcqChoices = (
+    choices: { text: string; isCorrect: boolean; explanation: string }[],
+    log: LogEntry,
+    choiceLocked: boolean,
+    monoText = false,
+  ) => {
+    const hasSelection = !!log.selectedChoice;
+    const showCorrect = choiceLocked && !log.isCorrect;
+    return choices.map((choice, idx) => {
+      const isSelected = log.selectedChoice === choice.text;
+      const revealCorrect = showCorrect && choice.isCorrect && !isSelected;
+      return (
+        <button
+          key={idx}
+          disabled={choiceLocked}
+          onClick={() => handleChoiceSelect(choice, log.id)}
+          className={cn(
+            "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
+            !hasSelection
+              ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
+              : isSelected
+                ? choice.isCorrect
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-red-50 border-red-200"
+                : revealCorrect
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-slate-50 border-slate-100 opacity-50",
+          )}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
+                !hasSelection
+                  ? "border-slate-200 group-hover:border-brand-pink"
+                  : isSelected
+                    ? choice.isCorrect
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-red-500 bg-red-500 text-white"
+                    : revealCorrect
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-slate-200",
+              )}
+            >
+              {isSelected
+                ? choice.isCorrect
+                  ? "✓"
+                  : "×"
+                : revealCorrect
+                  ? "✓"
+                  : null}
+            </div>
+            <p
+              className={cn(
+                "text-base leading-relaxed",
+                monoText && "font-mono whitespace-pre-line",
+                isSelected
+                  ? choice.isCorrect
+                    ? "text-emerald-900"
+                    : "text-red-900"
+                  : revealCorrect
+                    ? "text-emerald-900"
+                    : "text-slate-700",
+              )}
+            >
+              {choice.text}
+            </p>
+          </div>
+        </button>
+      );
+    });
   };
 
   const progressPanel = (
@@ -2821,8 +2893,7 @@ export default function App() {
                               (m) => m.id === log.technique,
                             )?.byPersona[background].levels[2];
                             if (!levelData?.choices) return null;
-                            const hasSelection = !!log.selectedChoice;
-                            const showCorrect = hasSelection && !log.isCorrect;
+                            const locked = !!log.selectedChoice;
                             return (
                               <div className="mt-6 space-y-4">
                                 {levelData.diagnosticPrompt && (
@@ -2835,73 +2906,7 @@ export default function App() {
                                     </pre>
                                   </div>
                                 )}
-                                {levelData.choices.map((choice, idx) => {
-                                  const isSelected =
-                                    log.selectedChoice === choice.text;
-                                  const locked = hasSelection;
-                                  const revealCorrect =
-                                    showCorrect && choice.isCorrect;
-                                  return (
-                                    <button
-                                      key={idx}
-                                      disabled={locked}
-                                      onClick={() =>
-                                        handleChoiceSelect(choice, log.id)
-                                      }
-                                      className={cn(
-                                        "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
-                                        !hasSelection
-                                          ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
-                                          : isSelected
-                                            ? choice.isCorrect
-                                              ? "bg-emerald-50 border-emerald-200"
-                                              : "bg-red-50 border-red-200"
-                                            : revealCorrect
-                                              ? "bg-emerald-50 border-emerald-200"
-                                              : "bg-slate-50 border-slate-100 opacity-50",
-                                      )}
-                                    >
-                                      <div className="flex items-start gap-4">
-                                        <div
-                                          className={cn(
-                                            "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
-                                            !hasSelection
-                                              ? "border-slate-200 group-hover:border-brand-pink"
-                                              : isSelected
-                                                ? choice.isCorrect
-                                                  ? "border-emerald-500 bg-emerald-500 text-white"
-                                                  : "border-red-500 bg-red-500 text-white"
-                                                : revealCorrect
-                                                  ? "border-emerald-500 bg-emerald-500 text-white"
-                                                  : "border-slate-200",
-                                          )}
-                                        >
-                                          {isSelected
-                                            ? choice.isCorrect
-                                              ? "✓"
-                                              : "×"
-                                            : revealCorrect
-                                              ? "✓"
-                                              : null}
-                                        </div>
-                                        <p
-                                          className={cn(
-                                            "text-base leading-relaxed",
-                                            isSelected
-                                              ? choice.isCorrect
-                                                ? "text-emerald-900"
-                                                : "text-red-900"
-                                              : revealCorrect
-                                                ? "text-emerald-900"
-                                                : "text-slate-700",
-                                          )}
-                                        >
-                                          {choice.text}
-                                        </p>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
+                                {renderMcqChoices(levelData.choices, log, locked)}
                               </div>
                             );
                           })()}
@@ -2918,88 +2923,23 @@ export default function App() {
                                     Attempt {(log.mcqAttempts ?? 0) + 1} of 2
                                   </p>
                                 )}
-                              {MODULES.find(
-                                (module) => module.id === log.technique,
-                              )?.byPersona[background].levels[1].choices?.map(
-                                (choice, idx) => {
-                                  const isTsL1Mcq =
-                                    log.technique === "Technique Selection" &&
-                                    log.level === 1;
-                                  const choiceLocked = isTsL1Mcq
-                                    ? !!(
-                                        log.selectedChoice &&
-                                        (log.isCorrect === true ||
-                                          (log.mcqAttempts ?? 0) >= 2)
-                                      )
-                                    : !!log.selectedChoice;
-                                  const isSelected =
-                                    log.selectedChoice === choice.text;
-                                  const hasSelection = !!log.selectedChoice;
-                                  const showCorrect = choiceLocked && !log.isCorrect;
-                                  const revealCorrect = showCorrect && choice.isCorrect && !isSelected;
-
-                                  return (
-                                    <button
-                                      key={idx}
-                                      disabled={choiceLocked}
-                                      onClick={() =>
-                                        handleChoiceSelect(choice, log.id)
-                                      }
-                                      className={cn(
-                                        "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
-                                        !hasSelection
-                                          ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
-                                          : isSelected
-                                            ? choice.isCorrect
-                                              ? "bg-emerald-50 border-emerald-200"
-                                              : "bg-red-50 border-red-200"
-                                            : revealCorrect
-                                              ? "bg-emerald-50 border-emerald-200"
-                                              : "bg-slate-50 border-slate-100 opacity-50",
-                                      )}
-                                    >
-                                      <div className="flex items-start gap-4">
-                                        <div
-                                          className={cn(
-                                            "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
-                                            !hasSelection
-                                              ? "border-slate-200 group-hover:border-brand-pink"
-                                              : isSelected
-                                                ? choice.isCorrect
-                                                  ? "border-emerald-500 bg-emerald-500 text-white"
-                                                  : "border-red-500 bg-red-500 text-white"
-                                                : revealCorrect
-                                                  ? "border-emerald-500 bg-emerald-500 text-white"
-                                                  : "border-slate-200",
-                                          )}
-                                        >
-                                          {isSelected
-                                            ? choice.isCorrect
-                                              ? "✓"
-                                              : "×"
-                                            : revealCorrect
-                                              ? "✓"
-                                              : null}
-                                        </div>
-                                        <p
-                                          className={cn(
-                                            "text-base leading-relaxed font-mono whitespace-pre-line",
-                                            isSelected
-                                              ? choice.isCorrect
-                                                ? "text-emerald-900"
-                                                : "text-red-900"
-                                              : revealCorrect
-                                                ? "text-emerald-900"
-                                                : "text-slate-700",
-                                          )}
-                                        >
-                                          {choice.text}
-                                        </p>
-                                      </div>
-                                    </button>
-                                  );
-                                },
-                              )}
+                              {(() => {
+                                const choices = MODULES.find(
+                                  (module) => module.id === log.technique,
+                                )?.byPersona[background].levels[1].choices;
+                                if (!choices) return null;
+                                const isTsL1Mcq =
+                                  log.technique === "Technique Selection" &&
+                                  log.level === 1;
+                                const choiceLocked = isTsL1Mcq
+                                  ? !!(
+                                      log.selectedChoice &&
+                                      (log.isCorrect === true ||
+                                        (log.mcqAttempts ?? 0) >= 2)
+                                    )
+                                  : !!log.selectedChoice;
+                                return renderMcqChoices(choices, log, choiceLocked, true);
+                              })()}
                               {log.technique === "Technique Selection" &&
                                 log.choiceFeedback && (
                                   <div className="p-5 rounded-xl border border-red-100 bg-red-50/40 markdown-content space-y-3">

@@ -546,33 +546,32 @@ Few-shot works when every example uses the **same labels, spacing, and line shap
             ],
           },
           2: {
-
-          title: "Spot the Gap",
-          task: "Look at the few-shot prompt below. Which Few-shot rubric criterion is MISSING or WEAKEST?",
-          diagnosticPrompt: 'Classify the following sources as "Primary" or "Secondary":\n\nInput: "A letter written by Charles Darwin in 1859."\nOutput: "Primary"\n\nInput: "A textbook chapter summarizing Darwin\'s theory of evolution."\nOutput: "Secondary"\n\nInput: "A research article written by Marie Curie in 1903."',
-          choices: [
-            {
-              text: "Pattern Consistency — the input/output format is inconsistent across examples",
-              isCorrect: false,
-              explanation: "The format is consistent: every example uses the same 'Input:' / 'Output:' labels with identical spacing.",
-            },
-            {
-              text: "Representational Logic — the examples don't demonstrate the classification rule",
-              isCorrect: false,
-              explanation: "Both examples clearly show the rule (first-hand source vs. derived commentary), so Representational Logic is present.",
-            },
-            {
-              text: "Completion Trigger — the prompt doesn't end with an output label to signal the model",
-              isCorrect: true,
-              explanation: "Correct. The last entry ends at 'Input: ...' with no trailing 'Output:' label. Without that trigger, the model may not know it should produce a label next. Adding 'Output:' on a new line after the final input would fix this.",
-            },
-            {
-              text: "Constraints — the allowed label values aren't defined",
-              isCorrect: false,
-              explanation: "The two allowed labels (Primary and Secondary) are shown clearly in the examples, so Constraints are present.",
-            },
-          ],
-                  },
+            title: "Spot the Gap",
+            task: "Look at the few-shot prompt below. Which Few-shot rubric criterion is MISSING or WEAKEST?",
+            diagnosticPrompt: 'Classify the following sources as "Primary" or "Secondary":\n\nInput: "A letter written by Charles Darwin in 1859."\nOutput: "Primary"\n\nInput: "A textbook chapter summarizing Darwin\'s theory of evolution."\nOutput: "Secondary"\n\nInput: "A research article written by Marie Curie in 1903."',
+            choices: [
+              {
+                text: "Pattern Consistency — the input/output format is inconsistent across examples",
+                isCorrect: false,
+                explanation: "The format is consistent: every example uses the same 'Input:' / 'Output:' labels with identical spacing.",
+              },
+              {
+                text: "Representational Logic — the examples don't demonstrate the classification rule",
+                isCorrect: false,
+                explanation: "Both examples clearly show the rule (first-hand source vs. derived commentary), so Representational Logic is present.",
+              },
+              {
+                text: "Completion Trigger — the prompt doesn't end with an output label to signal the model",
+                isCorrect: true,
+                explanation: "Correct. The last entry ends at 'Input: ...' with no trailing 'Output:' label. Without that trigger, the model may not know it should produce a label next. Adding 'Output:' on a new line after the final input would fix this.",
+              },
+              {
+                text: "Constraints — the allowed label values aren't defined",
+                isCorrect: false,
+                explanation: "The two allowed labels (Primary and Secondary) are shown clearly in the examples, so Constraints are present.",
+              },
+            ],
+          },
           3: {
 
             title: "Application",
@@ -624,33 +623,32 @@ Prefer prompts that repeat **Input:** / **Output:** (or equivalent) **exactly** 
             ],
           },
           2: {
-
-          title: "Spot the Gap",
-          task: "Look at the few-shot prompt below. Which Few-shot rubric criterion is MISSING or WEAKEST?",
-          diagnosticPrompt: 'Label each customer request as "Billing", "Technical", or "General":\n\nCustomer: "I can\'t reset my password." → Technical\nCustomer: "Please update my billing address." > Billing\nCustomer: "When is your customer service available?"\nAnswer:',
-          choices: [
-            {
-              text: "Pattern Consistency — the separator between input and label is inconsistent",
-              isCorrect: true,
-              explanation: "Correct. The first example uses '→' and the second uses '>'. Inconsistent separators break the pattern the model is meant to copy, making it less reliable. Every row should use the same separator (e.g., always '→').",
-            },
-            {
-              text: "Representational Logic — the examples don't cover the full range of categories",
-              isCorrect: false,
-              explanation: "Two of the three categories (Technical and Billing) are shown, which is sufficient to demonstrate the classification rule.",
-            },
-            {
-              text: "Completion Trigger — the prompt doesn't end with a label to signal the model",
-              isCorrect: false,
-              explanation: "'Answer:' at the end serves as a completion trigger, so this criterion is met.",
-            },
-            {
-              text: "Constraints — the allowed label values aren't defined",
-              isCorrect: false,
-              explanation: "All three labels (Billing, Technical, General) are stated in the opening instruction, so Constraints are present.",
-            },
-          ],
-                  },
+            title: "Spot the Gap",
+            task: "Look at the few-shot prompt below. Which Few-shot rubric criterion is MISSING or WEAKEST?",
+            diagnosticPrompt: 'Label each customer request as "Billing", "Technical", or "General":\n\nCustomer: "I can\'t reset my password." → Technical\nCustomer: "Please update my billing address." > Billing\nCustomer: "When is your customer service available?"\nAnswer:',
+            choices: [
+              {
+                text: "Pattern Consistency — the separator between input and label is inconsistent",
+                isCorrect: true,
+                explanation: "Correct. The first example uses '→' and the second uses '>'. Inconsistent separators break the pattern the model is meant to copy, making it less reliable. Every row should use the same separator (e.g., always '→').",
+              },
+              {
+                text: "Representational Logic — the examples don't cover the full range of categories",
+                isCorrect: false,
+                explanation: "Two of the three categories (Technical and Billing) are shown, which is sufficient to demonstrate the classification rule.",
+              },
+              {
+                text: "Completion Trigger — the prompt doesn't end with a label to signal the model",
+                isCorrect: false,
+                explanation: "'Answer:' at the end serves as a completion trigger, so this criterion is met.",
+              },
+              {
+                text: "Constraints — the allowed label values aren't defined",
+                isCorrect: false,
+                explanation: "All three labels (Billing, Technical, General) are stated in the opening instruction, so Constraints are present.",
+              },
+            ],
+          },
           3: {
 
             title: "Application",
@@ -714,33 +712,32 @@ Strong **Chain-of-Thought** prompts **order** the work: compute costs (with rule
             ],
           },
           2: {
-
-          title: "Spot the Gap",
-          task: "Look at the Chain-of-Thought prompt below. Which CoT rubric criterion is MISSING?",
-          diagnosticPrompt: "Solve this problem step by step, numbering each step: A class of 30 students needs to be divided into groups of 4 for a project. How many complete groups can be formed, and how many students will be left over?",
-          choices: [
-            {
-              text: "Reasoning Trigger — the prompt doesn't ask the model to think step by step",
-              isCorrect: false,
-              explanation: "'Step by step' is explicitly stated, so the Reasoning Trigger is present.",
-            },
-            {
-              text: "Logic Sequencing — no numbered or ordered steps are requested",
-              isCorrect: false,
-              explanation: "'Numbering each step' is explicitly requested, so Logic Sequencing is covered.",
-            },
-            {
-              text: "Specificity — the task isn't described clearly enough for the model to solve",
-              isCorrect: false,
-              explanation: "The numbers (30 students, groups of 4) and the two questions are clearly stated, so Specificity is present.",
-            },
-            {
-              text: "Format — no instruction on how to present the final answer",
-              isCorrect: true,
-              explanation: "Correct. The prompt asks for numbered steps but doesn't say how the final answer should look — a sentence, a table, bold numbers? Adding something like 'State the final answer in one sentence at the end' would complete this criterion.",
-            },
-          ],
-                  },
+            title: "Spot the Gap",
+            task: "Look at the Chain-of-Thought prompt below. Which CoT rubric criterion is MISSING?",
+            diagnosticPrompt: "Solve this problem step by step, numbering each step: A class of 30 students needs to be divided into groups of 4 for a project. How many complete groups can be formed, and how many students will be left over?",
+            choices: [
+              {
+                text: "Reasoning Trigger — the prompt doesn't ask the model to think step by step",
+                isCorrect: false,
+                explanation: "'Step by step' is explicitly stated, so the Reasoning Trigger is present.",
+              },
+              {
+                text: "Logic Sequencing — no numbered or ordered steps are requested",
+                isCorrect: false,
+                explanation: "'Numbering each step' is explicitly requested, so Logic Sequencing is covered.",
+              },
+              {
+                text: "Specificity — the task isn't described clearly enough for the model to solve",
+                isCorrect: false,
+                explanation: "The numbers (30 students, groups of 4) and the two questions are clearly stated, so Specificity is present.",
+              },
+              {
+                text: "Format — no instruction on how to present the final answer",
+                isCorrect: true,
+                explanation: "Correct. The prompt asks for numbered steps but doesn't say how the final answer should look — a sentence, a table, bold numbers? Adding something like 'State the final answer in one sentence at the end' would complete this criterion.",
+              },
+            ],
+          },
           3: {
 
             title: "Application",
@@ -794,33 +791,32 @@ Look for prompts that **sequence** math (base cost + insurance), **compare** ris
             ],
           },
           2: {
-
-          title: "Spot the Gap",
-          task: "Look at the Chain-of-Thought prompt below. Which CoT rubric criterion is MISSING?",
-          diagnosticPrompt: "Analyze step by step whether we should outsource customer support for our SaaS product. Weigh the pros and cons and give a final recommendation.",
-          choices: [
-            {
-              text: "Reasoning Trigger — the prompt doesn't ask the model to reason step by step",
-              isCorrect: false,
-              explanation: "'Analyze step by step' is a clear reasoning trigger, so this criterion is present.",
-            },
-            {
-              text: "Logic Sequencing — no structured reasoning path is defined",
-              isCorrect: false,
-              explanation: "'Weigh the pros and cons and give a final recommendation' provides a clear sequence (pros → cons → recommendation).",
-            },
-            {
-              text: "Specificity — the task isn't defined precisely enough",
-              isCorrect: false,
-              explanation: "The decision (outsource customer support for a SaaS product) is specific enough for the model to reason about.",
-            },
-            {
-              text: "Format — no output format is specified for the response",
-              isCorrect: true,
-              explanation: "Correct. The prompt describes what to do (pros, cons, recommendation) but not how to format the output. Should the pros and cons be a bullet list? A table? Should the recommendation be a single sentence or a paragraph? Specifying the format would make the output more predictable.",
-            },
-          ],
-                  },
+            title: "Spot the Gap",
+            task: "Look at the Chain-of-Thought prompt below. Which CoT rubric criterion is MISSING?",
+            diagnosticPrompt: "Analyze step by step whether we should outsource customer support for our SaaS product. Weigh the pros and cons and give a final recommendation.",
+            choices: [
+              {
+                text: "Reasoning Trigger — the prompt doesn't ask the model to reason step by step",
+                isCorrect: false,
+                explanation: "'Analyze step by step' is a clear reasoning trigger, so this criterion is present.",
+              },
+              {
+                text: "Logic Sequencing — no structured reasoning path is defined",
+                isCorrect: false,
+                explanation: "'Weigh the pros and cons and give a final recommendation' provides a clear sequence (pros → cons → recommendation).",
+              },
+              {
+                text: "Specificity — the task isn't defined precisely enough",
+                isCorrect: false,
+                explanation: "The decision (outsource customer support for a SaaS product) is specific enough for the model to reason about.",
+              },
+              {
+                text: "Format — no output format is specified for the response",
+                isCorrect: true,
+                explanation: "Correct. The prompt describes what to do (pros, cons, recommendation) but not how to format the output. Should the pros and cons be a bullet list? A table? Should the recommendation be a single sentence or a paragraph? Specifying the format would make the output more predictable.",
+              },
+            ],
+          },
           3: {
 
             title: "Application",
@@ -890,33 +886,32 @@ Ask whether the core work is **repeating a format** (Few-shot), **one-shot gener
             ],
           },
           2: {
-
-          title: "Technique Mismatch",
-          task: 'A professor wants to use AI to answer a straightforward factual question: "What year was the Eiffel Tower built?" They chose Chain-of-Thought (CoT) prompting. Why is CoT NOT the best choice here?',
-          diagnosticPrompt: 'Task: Answer the question "What year was the Eiffel Tower built?"\nTechnique chosen: Chain-of-Thought (CoT)\nPrompt: "Think step by step and show your reasoning to determine what year the Eiffel Tower was built."',
-          choices: [
-            {
-              text: "CoT requires the AI to have access to real-time data to answer factual questions",
-              isCorrect: false,
-              explanation: "CoT is about structuring reasoning, not about data access. This isn't why it's a poor fit here.",
-            },
-            {
-              text: "CoT prompts always produce too many tokens and are impractical for short questions",
-              isCorrect: false,
-              explanation: "Token length is a side effect, not the reason CoT mismatches this task.",
-            },
-            {
-              text: "CoT encourages step-by-step reasoning, which adds unnecessary complexity to a task that just needs a direct factual answer",
-              isCorrect: true,
-              explanation: "Correct. CoT is designed for tasks requiring multi-step reasoning — comparisons, trade-offs, or structured analysis. A single factual lookup has no reasoning chain to show. Zero-shot with a clear instruction would be simpler and more efficient here.",
-            },
-            {
-              text: "CoT only works when the user provides worked examples alongside the steps",
-              isCorrect: false,
-              explanation: "CoT doesn't require worked examples — that would be Few-shot. CoT just uses step-by-step reasoning triggers.",
-            },
-          ],
-                  },
+            title: "Technique Mismatch",
+            task: 'A professor wants to use AI to answer a straightforward factual question: "What year was the Eiffel Tower built?" They chose Chain-of-Thought (CoT) prompting. Why is CoT NOT the best choice here?',
+            diagnosticPrompt: 'Task: Answer the question "What year was the Eiffel Tower built?"\nTechnique chosen: Chain-of-Thought (CoT)\nPrompt: "Think step by step and show your reasoning to determine what year the Eiffel Tower was built."',
+            choices: [
+              {
+                text: "CoT requires the AI to have access to real-time data to answer factual questions",
+                isCorrect: false,
+                explanation: "CoT is about structuring reasoning, not about data access. This isn't why it's a poor fit here.",
+              },
+              {
+                text: "CoT prompts always produce too many tokens and are impractical for short questions",
+                isCorrect: false,
+                explanation: "Token length is a side effect, not the reason CoT mismatches this task.",
+              },
+              {
+                text: "CoT encourages step-by-step reasoning, which adds unnecessary complexity to a task that just needs a direct factual answer",
+                isCorrect: true,
+                explanation: "Correct. CoT is designed for tasks requiring multi-step reasoning — comparisons, trade-offs, or structured analysis. A single factual lookup has no reasoning chain to show. Zero-shot with a clear instruction would be simpler and more efficient here.",
+              },
+              {
+                text: "CoT only works when the user provides worked examples alongside the steps",
+                isCorrect: false,
+                explanation: "CoT doesn't require worked examples — that would be Few-shot. CoT just uses step-by-step reasoning triggers.",
+              },
+            ],
+          },
           3: {
 
             title: "Application",
@@ -985,33 +980,32 @@ Blame-shifting threads need **structured comparison** of parties and incentives 
             ],
           },
           2: {
-
-          title: "Technique Mismatch",
-          task: "A manager needs to classify 20 customer feedback emails into 3 predefined categories: Billing, Technical, and General. They chose Zero-shot prompting. Why might Zero-shot be LESS effective than another technique for this task?",
-          diagnosticPrompt: 'Task: Classify 20 customer feedback emails into "Billing", "Technical", or "General".\nTechnique chosen: Zero-shot\nPrompt: "Classify the following customer email as Billing, Technical, or General. Email: [insert email]"',
-          choices: [
-            {
-              text: "Zero-shot prompts cannot be used for classification tasks",
-              isCorrect: false,
-              explanation: "Zero-shot can absolutely handle classification — this isn't the issue.",
-            },
-            {
-              text: "Zero-shot gives the AI no examples of how each category applies, so it may classify ambiguous emails inconsistently across 20 items",
-              isCorrect: true,
-              explanation: "Correct. Without worked examples, the model must infer what each category means, leading to inconsistent labeling across edge cases. Few-shot — providing 2–3 labeled email examples — would anchor the classification logic and improve consistency at scale.",
-            },
-            {
-              text: "Zero-shot prompts are too short to process the full content of an email",
-              isCorrect: false,
-              explanation: "Prompt length is unrelated to the technique choice here. Zero-shot prompts can be as detailed as needed.",
-            },
-            {
-              text: "Zero-shot only works when a system prompt is provided separately",
-              isCorrect: false,
-              explanation: "Zero-shot doesn't require a system prompt. This isn't a limitation of the technique.",
-            },
-          ],
-                  },
+            title: "Technique Mismatch",
+            task: "A manager needs to classify 20 customer feedback emails into 3 predefined categories: Billing, Technical, and General. They chose Zero-shot prompting. Why might Zero-shot be LESS effective than another technique for this task?",
+            diagnosticPrompt: 'Task: Classify 20 customer feedback emails into "Billing", "Technical", or "General".\nTechnique chosen: Zero-shot\nPrompt: "Classify the following customer email as Billing, Technical, or General. Email: [insert email]"',
+            choices: [
+              {
+                text: "Zero-shot prompts cannot be used for classification tasks",
+                isCorrect: false,
+                explanation: "Zero-shot can absolutely handle classification — this isn't the issue.",
+              },
+              {
+                text: "Zero-shot gives the AI no examples of how each category applies, so it may classify ambiguous emails inconsistently across 20 items",
+                isCorrect: true,
+                explanation: "Correct. Without worked examples, the model must infer what each category means, leading to inconsistent labeling across edge cases. Few-shot — providing 2–3 labeled email examples — would anchor the classification logic and improve consistency at scale.",
+              },
+              {
+                text: "Zero-shot prompts are too short to process the full content of an email",
+                isCorrect: false,
+                explanation: "Prompt length is unrelated to the technique choice here. Zero-shot prompts can be as detailed as needed.",
+              },
+              {
+                text: "Zero-shot only works when a system prompt is provided separately",
+                isCorrect: false,
+                explanation: "Zero-shot doesn't require a system prompt. This isn't a limitation of the technique.",
+              },
+            ],
+          },
           3: {
 
             title: "Application",

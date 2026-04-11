@@ -378,7 +378,7 @@ export const MODULES: Module[] = [
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which zero-shot prompt is more likely to give a high-quality, specific result for a class or lesson task?",
-            hint: `### Hint 
+            hint: `### Hint
 Strong **zero-shot** prompts spell out **format**, **length**, **audience**, and **topic scope**. Weak prompts only name a broad topic. Ask: which option forces a specific, usable deliverable?`,
             choices: [
               {
@@ -396,6 +396,33 @@ Strong **zero-shot** prompts spell out **format**, **length**, **audience**, and
             ],
           },
           2: {
+            title: "Spot the Gap",
+            task: "Look at the prompt below. Which Zero-shot rubric criterion is MISSING?",
+            diagnosticPrompt: "Write a 3-paragraph summary of climate change causes for college students.",
+            choices: [
+              {
+                text: "Specificity — the topic isn't clearly defined",
+                isCorrect: false,
+                explanation: "The topic (climate change causes) is clearly named, so Specificity is present.",
+              },
+              {
+                text: "Audience — the target reader isn't specified",
+                isCorrect: false,
+                explanation: "College students are explicitly mentioned, so Audience is covered.",
+              },
+              {
+                text: "Format — the output structure isn't described",
+                isCorrect: false,
+                explanation: "Three paragraphs is a concrete format, so Format is present.",
+              },
+              {
+                text: "Constraints — no length limits or scope boundaries are set",
+                isCorrect: true,
+                explanation: "Correct. The prompt specifies paragraphs and audience but sets no word count, depth limit, or exclusions (e.g., 'don't include policy solutions'). Adding a constraint like 'keep each paragraph under 80 words' would strengthen it.",
+              },
+            ],
+          },
+          3: {
             title: "Application",
             task: 'Task: Write a prompt to explain "Photosynthesis" for an academic audience (students and instructors). Ensure your prompt is specific, sets a tone, defines the audience, and adds constraints (e.g., length or format).',
             hint: `### How to write a strong zero-shot prompt here
@@ -421,8 +448,8 @@ You are only writing *instructions* for the model—not the biology content itse
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which zero-shot prompt is more likely to give a high-quality, actionable result for a workplace task?",
-            hint: `### Hint 
-Workplace zero-shot prompts usually specify **deliverable type**, **length**, **audience**, **tone**, and **concrete topic**. Vague prompts only ask for a genre (e.g. “a blog post”) without constraints.`,
+            hint: `### Hint
+Workplace zero-shot prompts usually specify **deliverable type**, **length**, **audience**, **tone**, and **concrete topic**. Vague prompts only ask for a genre (e.g. "a blog post") without constraints.`,
             choices: [
               {
                 text: "Write a blog post about healthy eating.",
@@ -439,6 +466,33 @@ Workplace zero-shot prompts usually specify **deliverable type**, **length**, **
             ],
           },
           2: {
+            title: "Spot the Gap",
+            task: "Look at the prompt below. Which Zero-shot rubric criterion is MISSING?",
+            diagnosticPrompt: "Write a 3-bullet professional summary of Q3 marketing performance for the executive team, highlighting key results and next steps.",
+            choices: [
+              {
+                text: "Specificity — the subject matter isn't clearly defined",
+                isCorrect: false,
+                explanation: "Q3 marketing performance is a specific topic, so Specificity is present.",
+              },
+              {
+                text: "Audience — the target reader isn't identified",
+                isCorrect: false,
+                explanation: "The executive team is explicitly mentioned, so Audience is covered.",
+              },
+              {
+                text: "Format — no output structure is described",
+                isCorrect: false,
+                explanation: "Three bullets with key results and next steps provides a clear format.",
+              },
+              {
+                text: "Constraints — no word limits or scope boundaries are set",
+                isCorrect: true,
+                explanation: "Correct. The prompt gives format and audience but doesn't set a word limit per bullet or clarify what 'key results' includes. Adding something like 'keep each bullet under 20 words' or 'include only revenue and pipeline metrics' would tighten the output.",
+              },
+            ],
+          },
+          3: {
             title: "Application",
             task: "Task: Write a prompt to draft a short project update email for your manager. Ensure your prompt is specific (project name, timeframe), sets the tone, defines what to include (e.g., progress, blockers, next steps), and any constraints (length, no attachments).",
             hint: `### How to structure this zero-shot prompt
@@ -470,6 +524,7 @@ Use your own project names and dates; you are not graded on matching any sample 
         instruction:
           '### How to write a good Few-shot prompt:\n1. **Consistency is Key:** Use the exact same format for every example.\n2. **Label Clearly:** Use labels like "Input:" and "Output:" or "Q:" and "A:".\n3. **Diverse Examples:** Provide a range of examples (e.g., positive, negative, and neutral).\n4. **End with a Trigger:** Finish with a trailing label (like "Output:") to signal the AI to start.',
         levels: {
+
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which few-shot prompt better helps the AI classify academic tasks in a consistent format?",
@@ -491,6 +546,34 @@ Few-shot works when every example uses the **same labels, spacing, and line shap
             ],
           },
           2: {
+            title: "Spot the Gap",
+            task: "Look at the few-shot prompt below. Which Few-shot rubric criterion is MISSING or WEAKEST?",
+            diagnosticPrompt: 'Classify the following sources as "Primary" or "Secondary":\n\nInput: "A letter written by Charles Darwin in 1859."\nOutput: "Primary"\n\nInput: "A textbook chapter summarizing Darwin\'s theory of evolution."\nOutput: "Secondary"\n\nInput: "A research article written by Marie Curie in 1903."',
+            choices: [
+              {
+                text: "Pattern Consistency — the input/output format is inconsistent across examples",
+                isCorrect: false,
+                explanation: "The format is consistent: every example uses the same 'Input:' / 'Output:' labels with identical spacing.",
+              },
+              {
+                text: "Representational Logic — the examples don't demonstrate the classification rule",
+                isCorrect: false,
+                explanation: "Both examples clearly show the rule (first-hand source vs. derived commentary), so Representational Logic is present.",
+              },
+              {
+                text: "Completion Trigger — the prompt doesn't end with an output label to signal the model",
+                isCorrect: true,
+                explanation: "Correct. The last entry ends at 'Input: ...' with no trailing 'Output:' label. Without that trigger, the model may not know it should produce a label next. Adding 'Output:' on a new line after the final input would fix this.",
+              },
+              {
+                text: "Constraints — the allowed label values aren't defined",
+                isCorrect: false,
+                explanation: "The two allowed labels (Primary and Secondary) are shown clearly in the examples, so Constraints are present.",
+              },
+            ],
+          },
+          3: {
+
             title: "Application",
             task: 'Task: Create a few-shot prompt to classify academic support tips as "Time Management", "Learning Strategy", or "Assessment Prep". Provide at least 3 examples in a consistent format (e.g., Tip: ... Category: ...).',
             hint: `### Example *pattern* (different topic—illustration only)
@@ -518,6 +601,7 @@ Your real exercise uses **Time Management / Learning Strategy / Assessment Prep*
         instruction:
           '### How to write a good Few-shot prompt:\n1. **Consistency is Key:** Use the exact same format for every example.\n2. **Label Clearly:** Use labels like "Input:" and "Output:" or "Q:" and "A:".\n3. **Diverse Examples:** Provide a range of examples (e.g., positive, negative, and neutral).\n4. **End with a Trigger:** Finish with a trailing label (like "Output:") to signal the AI to start.',
         levels: {
+
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Which few-shot prompt better guides the AI to follow a specific format for classifying workplace items (e.g., emails, tickets)?",
@@ -539,6 +623,34 @@ Prefer prompts that repeat **Input:** / **Output:** (or equivalent) **exactly** 
             ],
           },
           2: {
+            title: "Spot the Gap",
+            task: "Look at the few-shot prompt below. Which Few-shot rubric criterion is MISSING or WEAKEST?",
+            diagnosticPrompt: 'Label each customer request as "Billing", "Technical", or "General":\n\nCustomer: "I can\'t reset my password." → Technical\nCustomer: "Please update my billing address." > Billing\nCustomer: "When is your customer service available?"\nAnswer:',
+            choices: [
+              {
+                text: "Pattern Consistency — the separator between input and label is inconsistent",
+                isCorrect: true,
+                explanation: "Correct. The first example uses '→' and the second uses '>'. Inconsistent separators break the pattern the model is meant to copy, making it less reliable. Every row should use the same separator (e.g., always '→').",
+              },
+              {
+                text: "Representational Logic — the examples don't cover the full range of categories",
+                isCorrect: false,
+                explanation: "Two of the three categories (Technical and Billing) are shown, which is sufficient to demonstrate the classification rule.",
+              },
+              {
+                text: "Completion Trigger — the prompt doesn't end with a label to signal the model",
+                isCorrect: false,
+                explanation: "'Answer:' at the end serves as a completion trigger, so this criterion is met.",
+              },
+              {
+                text: "Constraints — the allowed label values aren't defined",
+                isCorrect: false,
+                explanation: "All three labels (Billing, Technical, General) are stated in the opening instruction, so Constraints are present.",
+              },
+            ],
+          },
+          3: {
+
             title: "Application",
             task: 'Task: Create a few-shot prompt to classify support tickets or customer emails as "Billing", "Technical", or "General". Provide at least 3 examples in a consistent format.',
             hint: `### Example *pattern* (different labels—practice the shape)
@@ -572,6 +684,7 @@ Apply the same rhythm for **Billing / Technical / General** with **original** ti
         instruction:
           '### How to write a good Chain-of-Thought prompt:\n1. **Use Triggers:** Phrases like "Let\'s think step by step" or "Show your reasoning" are powerful.\n2. **Decompose Tasks:** Break complex problems into smaller, logical sub-tasks.\n3. **Provide a Path:** Sometimes showing one example of the reasoning process helps the AI follow suit.\n4. **Verify Steps:** Ask the AI to double-check its own logic at the end.',
         levels: {
+
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Scenario: Your school needs to deliver a fragile chemistry apparatus from City A to City D. Route 1 costs $40 with 5% damage risk and takes 4 hours. Route 2 costs $30 with 20% risk and takes 3 hours. If risk is over 15%, insurance adds $15. Which prompt best uses Chain-of-Thought?",
@@ -599,6 +712,34 @@ Strong **Chain-of-Thought** prompts **order** the work: compute costs (with rule
             ],
           },
           2: {
+            title: "Spot the Gap",
+            task: "Look at the Chain-of-Thought prompt below. Which CoT rubric criterion is MISSING?",
+            diagnosticPrompt: "Solve this problem step by step, numbering each step: A class of 30 students needs to be divided into groups of 4 for a project. How many complete groups can be formed, and how many students will be left over?",
+            choices: [
+              {
+                text: "Reasoning Trigger — the prompt doesn't ask the model to think step by step",
+                isCorrect: false,
+                explanation: "'Step by step' is explicitly stated, so the Reasoning Trigger is present.",
+              },
+              {
+                text: "Logic Sequencing — no numbered or ordered steps are requested",
+                isCorrect: false,
+                explanation: "'Numbering each step' is explicitly requested, so Logic Sequencing is covered.",
+              },
+              {
+                text: "Specificity — the task isn't described clearly enough for the model to solve",
+                isCorrect: false,
+                explanation: "The numbers (30 students, groups of 4) and the two questions are clearly stated, so Specificity is present.",
+              },
+              {
+                text: "Format — no instruction on how to present the final answer",
+                isCorrect: true,
+                explanation: "Correct. The prompt asks for numbered steps but doesn't say how the final answer should look — a sentence, a table, bold numbers? Adding something like 'State the final answer in one sentence at the end' would complete this criterion.",
+              },
+            ],
+          },
+          3: {
+
             title: "Application",
             task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle.\n\nThe school must deliver a fragile chemistry apparatus from City A to City D.\nRoute 1: A-B-D, cost $40, risk 5%, time 4h.\nRoute 2: A-C-D, cost $30, risk 20%, time 3h.\n\nConstraint: budget is $40, and if risk is over 15%, insurance adds $15.\nYour prompt should make the AI reason step by step and choose the best route.',
             hint: `### Structure your Chain-of-Thought prompt
@@ -622,11 +763,12 @@ Phrases like *think step by step* or *show reasoning before the final answer* he
         instruction:
           '### How to write a good Chain-of-Thought prompt:\n1. **Use Triggers:** Phrases like "Let\'s think step by step" or "Show your reasoning" are powerful.\n2. **Decompose Tasks:** Break complex problems into smaller, logical sub-tasks.\n3. **Provide a Path:** Sometimes showing one example of the reasoning process helps the AI follow suit.\n4. **Verify Steps:** Ask the AI to double-check its own logic at the end.',
         levels: {
+
           1: {
             title: "The Choice",
             task: "Select from given prompt examples. Scenario: A company must deliver a fragile medical package from City A to City D. Route 1 costs $40 with 5% risk and 4h. Route 2 costs $30 with 20% risk and 3h. If risk exceeds 15%, insurance adds $15. Which prompt best uses Chain-of-Thought?",
             hint: `### Hint 
-Look for prompts that **sequence** math (base cost + insurance), **compare** risk and time, **validate** budget, and **then** justify a recommendation—not a one-line “pick a route.”`,
+Look for prompts that **sequence** math (base cost + insurance), **compare** risk and time, **validate** budget, and **then** justify a recommendation—not a one-line "pick a route."`,
             choices: [
               {
                 text: "Pick the faster route and return only the route name.",
@@ -649,6 +791,34 @@ Look for prompts that **sequence** math (base cost + insurance), **compare** ris
             ],
           },
           2: {
+            title: "Spot the Gap",
+            task: "Look at the Chain-of-Thought prompt below. Which CoT rubric criterion is MISSING?",
+            diagnosticPrompt: "Analyze step by step whether we should outsource customer support for our SaaS product. Weigh the pros and cons and give a final recommendation.",
+            choices: [
+              {
+                text: "Reasoning Trigger — the prompt doesn't ask the model to reason step by step",
+                isCorrect: false,
+                explanation: "'Analyze step by step' is a clear reasoning trigger, so this criterion is present.",
+              },
+              {
+                text: "Logic Sequencing — no structured reasoning path is defined",
+                isCorrect: false,
+                explanation: "'Weigh the pros and cons and give a final recommendation' provides a clear sequence (pros → cons → recommendation).",
+              },
+              {
+                text: "Specificity — the task isn't defined precisely enough",
+                isCorrect: false,
+                explanation: "The decision (outsource customer support for a SaaS product) is specific enough for the model to reason about.",
+              },
+              {
+                text: "Format — no output format is specified for the response",
+                isCorrect: true,
+                explanation: "Correct. The prompt describes what to do (pros, cons, recommendation) but not how to format the output. Should the pros and cons be a bullet list? A table? Should the recommendation be a single sentence or a paragraph? Specifying the format would make the output more predictable.",
+              },
+            ],
+          },
+          3: {
+
             title: "Application",
             task: 'Write a Chain-of-Thought prompt for the "Green Logistics" puzzle. A company needs to deliver a fragile medical package from City A to City D.\nRoute 1: A-B-D, cost $40, risk 5%, time 4h.\nRoute 2: A-C-D, cost $30, risk 20%, time 3h.\nConstraint: budget is $40, and if risk is over 15%, insurance adds $15.\nYour prompt should force step-by-step reasoning and a final recommendation.',
             hint: `### Structure your Chain-of-Thought prompt
@@ -682,12 +852,13 @@ Connect what you practiced in **Zero-shot**, **Few-shot**, and **Chain-of-Though
 
 | Technique | What it is (in your prompt) | When to choose it |
 | :--- | :--- | :--- |
-| **Zero-shot** | One detailed instruction—**no examples**. You spell out goal, audience, tone, output shape, and limits in plain language. | A **single** deliverable where you can describe “good output” clearly without demonstrating examples (one essay plan, one lab handout spec, one email brief). |
+| **Zero-shot** | One detailed instruction—**no examples**. You spell out goal, audience, tone, output shape, and limits in plain language. | A **single** deliverable where you can describe "good output" clearly without demonstrating examples (one essay plan, one lab handout spec, one email brief). |
 | **Few-shot** | **Two or more parallel examples** with the **same labels and layout** every time, then a new case for the model to complete. | **Many similar lines**—labeling, rubric-style scoring, templated feedback—where **consistency across items** matters more than deep reasoning on each line. |
 | **Chain-of-Thought (CoT)** | **Numbered steps** or phrases like *think step by step* so the model **shows reasoning before** the final answer. | **Trade-offs, constraints, conflicting evidence, or planning**—when skipping intermediate steps usually produces shallow or wrong conclusions. |
 
 **Make your choice visible:** Shape your prompt so a reader can tell which technique you used—**examples** vs **explicit steps** vs **one rich instruction**—then write the full prompt accordingly.`,
         levels: {
+
           1: {
             title: "Technique Match",
             task: 'You are a Graduate Research Assistant comparing 10 abstracts about "AI in the Classroom." Some argue AI improves engagement, others argue it increases cognitive load. Your advisor wants a synthesis that maps disagreements and proposes a unified research question. Which prompting method is MOST suitable?',
@@ -715,12 +886,40 @@ Ask whether the core work is **repeating a format** (Few-shot), **one-shot gener
             ],
           },
           2: {
+            title: "Technique Mismatch",
+            task: 'A professor wants to use AI to answer a straightforward factual question: "What year was the Eiffel Tower built?" They chose Chain-of-Thought (CoT) prompting. Why is CoT NOT the best choice here?',
+            diagnosticPrompt: 'Task: Answer the question "What year was the Eiffel Tower built?"\nTechnique chosen: Chain-of-Thought (CoT)\nPrompt: "Think step by step and show your reasoning to determine what year the Eiffel Tower was built."',
+            choices: [
+              {
+                text: "CoT requires the AI to have access to real-time data to answer factual questions",
+                isCorrect: false,
+                explanation: "CoT is about structuring reasoning, not about data access. This isn't why it's a poor fit here.",
+              },
+              {
+                text: "CoT prompts always produce too many tokens and are impractical for short questions",
+                isCorrect: false,
+                explanation: "Token length is a side effect, not the reason CoT mismatches this task.",
+              },
+              {
+                text: "CoT encourages step-by-step reasoning, which adds unnecessary complexity to a task that just needs a direct factual answer",
+                isCorrect: true,
+                explanation: "Correct. CoT is designed for tasks requiring multi-step reasoning — comparisons, trade-offs, or structured analysis. A single factual lookup has no reasoning chain to show. Zero-shot with a clear instruction would be simpler and more efficient here.",
+              },
+              {
+                text: "CoT only works when the user provides worked examples alongside the steps",
+                isCorrect: false,
+                explanation: "CoT doesn't require worked examples — that would be Few-shot. CoT just uses step-by-step reasoning triggers.",
+              },
+            ],
+          },
+          3: {
+
             title: "Application",
             task: "You are a Head TA for a course with 300 students and raw peer-feedback comments. You need to detect non-constructive language, assign Contribution Level (High/Medium/Low), and output: Student Name | Constructive (Y/N) | Contribution | TA Note.",
             hint: `### After you pick a method (Step 1)
 For **high-volume rows** with a **rigid pipe format**, **Few-shot** often fits: write **2–3 complete example lines** that show the exact **Name | Constructive | Contribution | Note** pattern, then a line with **Input:** (or similar) waiting for the next comment.
 
-Define **what “constructive” means** and **how you judge High/Medium/Low** in plain language. Invent **original** example names and comments—do not copy any reference solution.`,
+Define **what "constructive" means** and **how you judge High/Medium/Low** in plain language. Invent **original** example names and comments—do not copy any reference solution.`,
             referenceMethod: "Few-shot",
             referenceRationale:
               "Few-shot is most efficient and accurate because this is a high-volume, pattern-driven formatting task where consistency is critical across many records.",
@@ -747,12 +946,13 @@ Apply **Zero-shot**, **Few-shot**, and **Chain-of-Thought** at work: align **how
 
 | Technique | What it is (in your prompt) | When to choose it |
 | :--- | :--- | :--- |
-| **Zero-shot** | One detailed instruction—**no examples**. You spell out goal, audience, tone, output shape, and limits in plain language. | A **single** deliverable where you can describe “good output” clearly without demonstrating examples (one executive summary brief, one stakeholder email, one spec). |
+| **Zero-shot** | One detailed instruction—**no examples**. You spell out goal, audience, tone, output shape, and limits in plain language. | A **single** deliverable where you can describe "good output" clearly without demonstrating examples (one executive summary brief, one stakeholder email, one spec). |
 | **Few-shot** | **Two or more parallel examples** with the **same labels and layout** every time, then a new case for the model to complete. | **High-volume or repetitive** outputs—ticket routing, CRM fields, slide outlines—where **pattern consistency** across rows beats reasoning depth per row. |
 | **Chain-of-Thought (CoT)** | **Numbered steps** or phrases like *think step by step* so the model **shows reasoning before** the final answer. | **Trade-offs, budgets, root-cause analysis, blame-heavy threads, or strategy**—when the wrong answer is costly if intermediate logic is skipped. |
 
 **Make your choice visible:** Shape your prompt so a reader can tell which technique you used—**examples** vs **explicit steps** vs **one rich instruction**—then write the full prompt accordingly.`,
         levels: {
+
           1: {
             title: "Technique Match",
             task: "You have a 15-email thread between a client, developer, and designer about delays and blame-shifting. Your boss wants a concise executive summary with root cause and a middle-ground solution. Which method is MOST suitable?",
@@ -780,6 +980,34 @@ Blame-shifting threads need **structured comparison** of parties and incentives 
             ],
           },
           2: {
+            title: "Technique Mismatch",
+            task: "A manager needs to classify 20 customer feedback emails into 3 predefined categories: Billing, Technical, and General. They chose Zero-shot prompting. Why might Zero-shot be LESS effective than another technique for this task?",
+            diagnosticPrompt: 'Task: Classify 20 customer feedback emails into "Billing", "Technical", or "General".\nTechnique chosen: Zero-shot\nPrompt: "Classify the following customer email as Billing, Technical, or General. Email: [insert email]"',
+            choices: [
+              {
+                text: "Zero-shot prompts cannot be used for classification tasks",
+                isCorrect: false,
+                explanation: "Zero-shot can absolutely handle classification — this isn't the issue.",
+              },
+              {
+                text: "Zero-shot gives the AI no examples of how each category applies, so it may classify ambiguous emails inconsistently across 20 items",
+                isCorrect: true,
+                explanation: "Correct. Without worked examples, the model must infer what each category means, leading to inconsistent labeling across edge cases. Few-shot — providing 2–3 labeled email examples — would anchor the classification logic and improve consistency at scale.",
+              },
+              {
+                text: "Zero-shot prompts are too short to process the full content of an email",
+                isCorrect: false,
+                explanation: "Prompt length is unrelated to the technique choice here. Zero-shot prompts can be as detailed as needed.",
+              },
+              {
+                text: "Zero-shot only works when a system prompt is provided separately",
+                isCorrect: false,
+                explanation: "Zero-shot doesn't require a system prompt. This isn't a limitation of the technique.",
+              },
+            ],
+          },
+          3: {
+
             title: "Application",
             task: 'Your company is hiring for a niche "Senior EdTech Researcher" role. You must process 200 resumes and output CSV-ready rows: Name | University Match (Y/N) | Fit Score | Reason.',
             hint: `### After you pick a method (Step 1)

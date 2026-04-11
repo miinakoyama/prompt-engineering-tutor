@@ -232,6 +232,7 @@ export default function App() {
     string | null
   >(null);
   const [focusLogId, setFocusLogId] = useState<string | null>(null);
+  const [bottomFocusLogId, setBottomFocusLogId] = useState<string | null>(null);
   const [pretestAnswers, setPretestAnswers] = useState<AssessmentAnswers>(
     createEmptyAssessmentAnswers(),
   );
@@ -343,6 +344,22 @@ export default function App() {
       setFocusLogId(null);
     });
   }, [focusLogId, logs]);
+
+  useEffect(() => {
+    if (!bottomFocusLogId) {
+      return;
+    }
+
+    const element = document.getElementById(`log-${bottomFocusLogId}`);
+    if (!element) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: "smooth", block: "end" });
+      setBottomFocusLogId(null);
+    });
+  }, [bottomFocusLogId, logs]);
 
   const isAssessmentComplete = (
     tasks: AssessmentTask[],
@@ -605,7 +622,11 @@ export default function App() {
       task: levelData.task,
     });
 
-    setFocusLogId(logId);
+    if (level === 2) {
+      setBottomFocusLogId(logId);
+    } else {
+      setFocusLogId(logId);
+    }
     setQuestionStartedAt((prev) => ({
       ...prev,
       [`learning-${currentTechnique}-${level}`]: Date.now(),
@@ -754,12 +775,13 @@ export default function App() {
       }),
     );
 
-    addLog({
+    const reviewLogId = addLog({
       type: "review",
       content: `**${choice.isCorrect ? "Correct" : "Not quite"}**\n\n${choice.explanation}`,
       isCorrect: choice.isCorrect,
       reviewType: "choice",
     });
+    setFocusLogId(reviewLogId);
 
     const questionKey = isTsL1
       ? `learning-${currentTechnique}-${currentLevel}-mcq-${nextMcqAttempt}`
@@ -812,15 +834,17 @@ export default function App() {
       return;
     }
 
-    const module = MODULES.find((item) => item.id === currentTechnique)!;
-    const instructionLogId = addLog({
-      type: "intro",
-      content: module.byPersona[background].instruction,
-    });
-    setFocusLogId(instructionLogId);
-
     const nextLevel = (currentLevel + 1) as Level;
-    if (nextLevel <= 2) {
+    if (nextLevel <= 3) {
+      if (currentLevel === 1) {
+        // Show the technique instruction only once, after Level 1
+        const module = MODULES.find((item) => item.id === currentTechnique)!;
+        const instructionLogId = addLog({
+          type: "intro",
+          content: module.byPersona[background].instruction,
+        });
+        setFocusLogId(instructionLogId);
+      }
       setPendingAction({ kind: "level", level: nextLevel });
     }
   };
@@ -840,12 +864,12 @@ export default function App() {
 
     const activeTechnique = currentTechnique;
     const activeLevel = currentLevel;
-    const isTsL2 =
+    const isTsL3 =
       targetLog?.technique === "Technique Selection" &&
-      targetLog?.level === 2;
+      targetLog?.level === 3;
     const prevPromptAttempts = targetLog?.promptAttempts ?? 0;
 
-    if (isTsL2 && prevPromptAttempts >= 2) {
+    if (isTsL3 && prevPromptAttempts >= 2) {
       return;
     }
 
@@ -853,7 +877,7 @@ export default function App() {
     const moduleContent = module.byPersona[background];
     const levelTask = moduleContent.levels[activeLevel].task;
 
-    if (!isTsL2) {
+    if (!isTsL3) {
       setLogs((prev) =>
         prev.map((log) => {
           if (log.id === logId) {
@@ -895,9 +919,9 @@ export default function App() {
       const nextPromptAttempt = prevPromptAttempts + 1;
       const isFullyCorrect = feedbackScore?.grade === "green";
       const promptCompleteNow =
-        !isTsL2 || isFullyCorrect || nextPromptAttempt >= 2;
+        !isTsL3 || isFullyCorrect || nextPromptAttempt >= 2;
 
-      if (isTsL2 && !promptCompleteNow) {
+      if (isTsL3 && !promptCompleteNow) {
         const promptStepRetryHint =
           "Revise your prompt based on the feedback below and submit one more time.";
         const feedbackTextForSave = [feedbackText, promptStepRetryHint]
@@ -970,7 +994,7 @@ export default function App() {
       }
 
       const reviewContent =
-        isTsL2 &&
+        isTsL3 &&
         nextPromptAttempt >= 2 &&
         !isFullyCorrect &&
         feedbackText
@@ -983,7 +1007,7 @@ export default function App() {
             ? {
                 ...log,
                 submittedPrompt: prompt,
-                ...(isTsL2
+                ...(isTsL3
                   ? {
                       promptAttempts: nextPromptAttempt,
                       promptStepFeedback: undefined,
@@ -1014,7 +1038,7 @@ export default function App() {
       setIsWaitingForResult(false);
 
       markLevelComplete(activeTechnique, activeLevel);
-      const questionKey = isTsL2
+      const questionKey = isTsL3
         ? `learning-${activeTechnique}-${activeLevel}-prompt-${nextPromptAttempt}`
         : `learning-${activeTechnique}-${activeLevel}`;
       const startedAt = questionStartedAt[
@@ -1041,7 +1065,7 @@ export default function App() {
           selectedMethod: selectedMethod,
           selectedRationale: targetLog?.selectedRationale,
           criteriaScores: feedbackScore?.criteriaScores,
-          ...(isTsL2
+          ...(isTsL3
             ? {
                 metadata: {
                   stage: "technique_selection_prompt",
@@ -1059,7 +1083,7 @@ export default function App() {
             durationSec,
             totalScore: feedbackScore?.totalScore,
             maxScore: feedbackScore?.maxScore,
-            ...(isTsL2
+            ...(isTsL3
               ? {
                   attempt: nextPromptAttempt,
                   stepCompleted: true,
@@ -1139,7 +1163,7 @@ export default function App() {
     }
 
     const module = MODULES.find((item) => item.id === targetLog.technique)!;
-    const levelData = module.byPersona[background].levels[targetLog.level || 2];
+    const levelData = module.byPersona[background].levels[targetLog.level || 3];
 
     setMethodReviewingLogId(logId);
     try {
@@ -1416,7 +1440,7 @@ export default function App() {
     (sum, levels) => sum + levels.length,
     0,
   );
-  const totalExerciseCount = MODULES.length * 2;
+  const totalExerciseCount = MODULES.length * 3;
   const progressPercent = (completedExerciseCount / totalExerciseCount) * 100;
 
   const getPendingActionLabel = () => {
@@ -1433,6 +1457,79 @@ export default function App() {
     }
 
     return "Go to Post-Test";
+  };
+
+  const renderMcqChoices = (
+    choices: { text: string; isCorrect: boolean; explanation: string }[],
+    log: LogEntry,
+    choiceLocked: boolean,
+    monoText = false,
+  ) => {
+    const hasSelection = !!log.selectedChoice;
+    const showCorrect = choiceLocked && !log.isCorrect;
+    return choices.map((choice, idx) => {
+      const isSelected = log.selectedChoice === choice.text;
+      const revealCorrect = showCorrect && choice.isCorrect && !isSelected;
+      return (
+        <button
+          key={idx}
+          disabled={choiceLocked}
+          onClick={() => handleChoiceSelect(choice, log.id)}
+          className={cn(
+            "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
+            !hasSelection
+              ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
+              : isSelected
+                ? choice.isCorrect
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-red-50 border-red-200"
+                : revealCorrect
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-slate-50 border-slate-100 opacity-50",
+          )}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
+                !hasSelection
+                  ? "border-slate-200 group-hover:border-brand-pink"
+                  : isSelected
+                    ? choice.isCorrect
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-red-500 bg-red-500 text-white"
+                    : revealCorrect
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-slate-200",
+              )}
+            >
+              {isSelected
+                ? choice.isCorrect
+                  ? "✓"
+                  : "×"
+                : revealCorrect
+                  ? "✓"
+                  : null}
+            </div>
+            <p
+              className={cn(
+                "text-base leading-relaxed",
+                monoText && "font-mono whitespace-pre-line",
+                isSelected
+                  ? choice.isCorrect
+                    ? "text-emerald-900"
+                    : "text-red-900"
+                  : revealCorrect
+                    ? "text-emerald-900"
+                    : "text-slate-700",
+              )}
+            >
+              {choice.text}
+            </p>
+          </div>
+        </button>
+      );
+    });
   };
 
   const progressPanel = (
@@ -1470,7 +1567,7 @@ export default function App() {
             >
               <div className="flex items-center gap-3">
                 <div className="flex gap-1">
-                  {[1, 2].map((level) => {
+                  {[1, 2, 3].map((level) => {
                     const typedLevel = level as Level;
                     const isComplete = completed.includes(typedLevel);
                     const isCurrentStep =
@@ -1499,7 +1596,7 @@ export default function App() {
                 >
                   {module.id}
                 </p>
-                {completed.length === 2 && (
+                {completed.length === 3 && (
                   <span className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-600">
                     ✓
                   </span>
@@ -1931,7 +2028,7 @@ export default function App() {
     const sessions = adminData?.sessions || [];
     const pendingAttempts = adminData?.pendingAttempts || [];
     const attempts = adminData?.attempts || [];
-    const matchesEnvFilter = (row: { app_env?: string }) => {
+    const matchesEnvFilter = (row: { app_env?: string | null }) => {
       if (adminEnvFilter === "all") {
         return true;
       }
@@ -1964,7 +2061,7 @@ export default function App() {
       },
       {} as Record<string, AdminAttemptRow[]>,
     );
-    const totalLearningSteps = MODULES.length * 2;
+    const totalLearningSteps = MODULES.length * 3;
     const getPhaseGradeStatus = (
       attemptsForSession: AdminAttemptRow[],
       phase: "pretest" | "posttest",
@@ -2656,7 +2753,7 @@ export default function App() {
                                   </p>
                                 )}
                               {log.technique === "Technique Selection" &&
-                                log.level === 2 && (
+                                log.level === 3 && (
                                   <div className="space-y-1 text-sm font-medium text-slate-600 normal-case tracking-normal">
                                     <p>
                                       Step 1 (method selection) allows a
@@ -2791,6 +2888,29 @@ export default function App() {
                             );
                           })()}
 
+                          {log.level === 2 && (() => {
+                            const levelData = MODULES.find(
+                              (m) => m.id === log.technique,
+                            )?.byPersona[background].levels[2];
+                            if (!levelData?.choices) return null;
+                            const locked = !!log.selectedChoice;
+                            return (
+                              <div className="mt-6 space-y-4">
+                                {levelData.diagnosticPrompt && (
+                                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70">
+                                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400 mb-3">
+                                      Sample Prompt
+                                    </p>
+                                    <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono leading-relaxed">
+                                      {levelData.diagnosticPrompt}
+                                    </pre>
+                                  </div>
+                                )}
+                                {renderMcqChoices(levelData.choices, log, locked)}
+                              </div>
+                            );
+                          })()}
+
                           {log.level === 1 && (
                             <div className="mt-12 space-y-4">
                               {log.technique === "Technique Selection" &&
@@ -2803,78 +2923,23 @@ export default function App() {
                                     Attempt {(log.mcqAttempts ?? 0) + 1} of 2
                                   </p>
                                 )}
-                              {MODULES.find(
-                                (module) => module.id === log.technique,
-                              )?.byPersona[background].levels[1].choices?.map(
-                                (choice, idx) => {
-                                  const isTsL1Mcq =
-                                    log.technique === "Technique Selection" &&
-                                    log.level === 1;
-                                  const choiceLocked = isTsL1Mcq
-                                    ? !!(
-                                        log.selectedChoice &&
-                                        (log.isCorrect === true ||
-                                          (log.mcqAttempts ?? 0) >= 2)
-                                      )
-                                    : !!log.selectedChoice;
-                                  const isSelected =
-                                    log.selectedChoice === choice.text;
-                                  const hasSelection = !!log.selectedChoice;
-
-                                  return (
-                                    <button
-                                      key={idx}
-                                      disabled={choiceLocked}
-                                      onClick={() =>
-                                        handleChoiceSelect(choice, log.id)
-                                      }
-                                      className={cn(
-                                        "w-full p-6 rounded-2xl border text-left transition-all group relative overflow-hidden",
-                                        !hasSelection
-                                          ? "bg-white border-slate-100 hover:border-brand-pink hover:shadow-md"
-                                          : isSelected
-                                            ? choice.isCorrect
-                                              ? "bg-emerald-50 border-emerald-200"
-                                              : "bg-red-50 border-red-200"
-                                            : "bg-slate-50 border-slate-100 opacity-50",
-                                      )}
-                                    >
-                                      <div className="flex items-start gap-4">
-                                        <div
-                                          className={cn(
-                                            "w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-1",
-                                            !hasSelection
-                                              ? "border-slate-200 group-hover:border-brand-pink"
-                                              : isSelected
-                                                ? choice.isCorrect
-                                                  ? "border-emerald-500 bg-emerald-500 text-white"
-                                                  : "border-red-500 bg-red-500 text-white"
-                                                : "border-slate-200",
-                                          )}
-                                        >
-                                          {isSelected
-                                            ? choice.isCorrect
-                                              ? "✓"
-                                              : "×"
-                                            : null}
-                                        </div>
-                                        <p
-                                          className={cn(
-                                            "text-base leading-relaxed font-mono whitespace-pre-line",
-                                            isSelected
-                                              ? choice.isCorrect
-                                                ? "text-emerald-900"
-                                                : "text-red-900"
-                                              : "text-slate-700",
-                                          )}
-                                        >
-                                          {choice.text}
-                                        </p>
-                                      </div>
-                                    </button>
-                                  );
-                                },
-                              )}
+                              {(() => {
+                                const choices = MODULES.find(
+                                  (module) => module.id === log.technique,
+                                )?.byPersona[background].levels[1].choices;
+                                if (!choices) return null;
+                                const isTsL1Mcq =
+                                  log.technique === "Technique Selection" &&
+                                  log.level === 1;
+                                const choiceLocked = isTsL1Mcq
+                                  ? !!(
+                                      log.selectedChoice &&
+                                      (log.isCorrect === true ||
+                                        (log.mcqAttempts ?? 0) >= 2)
+                                    )
+                                  : !!log.selectedChoice;
+                                return renderMcqChoices(choices, log, choiceLocked, true);
+                              })()}
                               {log.technique === "Technique Selection" &&
                                 log.choiceFeedback && (
                                   <div className="p-5 rounded-xl border border-red-100 bg-red-50/40 markdown-content space-y-3">
@@ -2908,10 +2973,10 @@ export default function App() {
                             </div>
                           )}
 
-                          {log.level && log.level >= 2 && (
+                          {log.level && log.level >= 3 && (
                             <div className="mt-12 space-y-5">
                               {log.technique === "Technique Selection" &&
-                                log.level === 2 && (
+                                log.level === 3 && (
                                   <>
                                     <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
                                       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
@@ -3068,6 +3133,59 @@ export default function App() {
                                               </div>
                                             )}
                                           </div>
+                                          {log.methodFeedbackScore && (
+                                            <div className="space-y-2">
+                                              {log.methodFeedbackScore.criteriaScores.some(
+                                                (c) => c.score === 1,
+                                              ) && (
+                                                <div className="flex flex-wrap gap-2">
+                                                  {log.methodFeedbackScore.criteriaScores
+                                                    .filter((c) => c.score === 1)
+                                                    .map((c) => (
+                                                      <span
+                                                        key={c.id}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100"
+                                                      >
+                                                        <span className="text-emerald-600 text-sm font-bold">
+                                                          ✓
+                                                        </span>
+                                                        <span className="text-sm font-medium text-emerald-700">
+                                                          {c.label}
+                                                        </span>
+                                                      </span>
+                                                    ))}
+                                                </div>
+                                              )}
+                                              {log.methodFeedbackScore.criteriaScores.some(
+                                                (c) => c.score === 0,
+                                              ) && (
+                                                <div className="space-y-1.5">
+                                                  {log.methodFeedbackScore.criteriaScores
+                                                    .filter((c) => c.score === 0)
+                                                    .map((c) => (
+                                                      <div
+                                                        key={c.id}
+                                                        className="flex gap-3 items-start px-3 py-2.5 rounded-lg bg-red-50 border border-red-100"
+                                                      >
+                                                        <span className="text-red-500 text-sm font-bold mt-0.5 shrink-0">
+                                                          ✗
+                                                        </span>
+                                                        <div>
+                                                          <p className="text-sm font-semibold text-red-700">
+                                                            {c.label}
+                                                          </p>
+                                                          {c.reason && (
+                                                            <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                                                              {c.reason}
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                           {log.methodFeedback && (
                                             <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                               {log.methodFeedback}
@@ -3084,19 +3202,19 @@ export default function App() {
                                 )}
 
                               {(log.technique !== "Technique Selection" ||
-                                log.level !== 2 ||
+                                log.level !== 3 ||
                                 log.methodStepCompleted) && (
                                 <div
                                   className={cn(
                                     "space-y-3",
                                     log.technique === "Technique Selection" &&
-                                      log.level === 2 &&
+                                      log.level === 3 &&
                                       log.methodStepCompleted &&
                                       "p-5 rounded-xl border border-slate-200 bg-slate-50/70",
                                   )}
                                 >
                                   {log.technique === "Technique Selection" &&
-                                    log.level === 2 &&
+                                    log.level === 3 &&
                                     log.methodStepCompleted && (
                                       <>
                                         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
@@ -3170,7 +3288,7 @@ export default function App() {
                                     )}
                                   </div>
                                   {log.technique === "Technique Selection" &&
-                                    log.level === 2 &&
+                                    log.level === 3 &&
                                     log.methodStepCompleted &&
                                     (log.promptAttempts ?? 0) >= 1 &&
                                     log.promptStepFeedback && (
@@ -3224,6 +3342,59 @@ export default function App() {
                                             </div>
                                           )}
                                         </div>
+                                        {log.promptStepFeedbackScore && (
+                                          <div className="space-y-2">
+                                            {log.promptStepFeedbackScore.criteriaScores.some(
+                                              (c) => c.score === 1,
+                                            ) && (
+                                              <div className="flex flex-wrap gap-2">
+                                                {log.promptStepFeedbackScore.criteriaScores
+                                                  .filter((c) => c.score === 1)
+                                                  .map((c) => (
+                                                    <span
+                                                      key={c.id}
+                                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100"
+                                                    >
+                                                      <span className="text-emerald-600 text-sm font-bold">
+                                                        ✓
+                                                      </span>
+                                                      <span className="text-sm font-medium text-emerald-700">
+                                                        {c.label}
+                                                      </span>
+                                                    </span>
+                                                  ))}
+                                              </div>
+                                            )}
+                                            {log.promptStepFeedbackScore.criteriaScores.some(
+                                              (c) => c.score === 0,
+                                            ) && (
+                                              <div className="space-y-1.5">
+                                                {log.promptStepFeedbackScore.criteriaScores
+                                                  .filter((c) => c.score === 0)
+                                                  .map((c) => (
+                                                    <div
+                                                      key={c.id}
+                                                      className="flex gap-3 items-start px-3 py-2.5 rounded-lg bg-red-50 border border-red-100"
+                                                    >
+                                                      <span className="text-red-500 text-sm font-bold mt-0.5 shrink-0">
+                                                        ✗
+                                                      </span>
+                                                      <div>
+                                                        <p className="text-sm font-semibold text-red-700">
+                                                          {c.label}
+                                                        </p>
+                                                        {c.reason && (
+                                                          <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                                                            {c.reason}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                         <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">
                                           {log.promptStepFeedback}
                                         </p>
@@ -3387,40 +3558,55 @@ export default function App() {
                               </div>
 
                               {log.feedbackScore && (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {log.feedbackScore.criteriaScores.map(
-                                    (criterion) => (
-                                      <div
-                                        key={criterion.id}
-                                        className={cn(
-                                          "px-3 py-2 rounded-lg flex items-center gap-2",
-                                          criterion.score === 1
-                                            ? "bg-emerald-50"
-                                            : "bg-red-50",
-                                        )}
-                                      >
-                                        <span
-                                          className={cn(
-                                            "text-sm font-bold",
-                                            criterion.score === 1
-                                              ? "text-emerald-600"
-                                              : "text-red-500",
-                                          )}
-                                        >
-                                          {criterion.score === 1 ? "✓" : "✗"}
-                                        </span>
-                                        <span
-                                          className={cn(
-                                            "text-sm font-medium",
-                                            criterion.score === 1
-                                              ? "text-emerald-700"
-                                              : "text-red-700",
-                                          )}
-                                        >
-                                          {criterion.label}
-                                        </span>
-                                      </div>
-                                    ),
+                                <div className="space-y-2">
+                                  {log.feedbackScore.criteriaScores.some(
+                                    (c) => c.score === 1,
+                                  ) && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {log.feedbackScore.criteriaScores
+                                        .filter((c) => c.score === 1)
+                                        .map((c) => (
+                                          <span
+                                            key={c.id}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100"
+                                          >
+                                            <span className="text-emerald-600 text-sm font-bold">
+                                              ✓
+                                            </span>
+                                            <span className="text-sm font-medium text-emerald-700">
+                                              {c.label}
+                                            </span>
+                                          </span>
+                                        ))}
+                                    </div>
+                                  )}
+                                  {log.feedbackScore.criteriaScores.some(
+                                    (c) => c.score === 0,
+                                  ) && (
+                                    <div className="space-y-1.5">
+                                      {log.feedbackScore.criteriaScores
+                                        .filter((c) => c.score === 0)
+                                        .map((c) => (
+                                          <div
+                                            key={c.id}
+                                            className="flex gap-3 items-start px-3 py-2.5 rounded-lg bg-red-50 border border-red-100"
+                                          >
+                                            <span className="text-red-500 text-sm font-bold mt-0.5 shrink-0">
+                                              ✗
+                                            </span>
+                                            <div>
+                                              <p className="text-sm font-semibold text-red-700">
+                                                {c.label}
+                                              </p>
+                                              {c.reason && (
+                                                <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">
+                                                  {c.reason}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                    </div>
                                   )}
                                 </div>
                               )}

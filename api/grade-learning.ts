@@ -41,7 +41,12 @@ function formatCriteriaList(rubric: Rubric) {
 }
 
 function formatScoreTemplate(rubric: Rubric) {
-  return rubric.criteria.map((c) => `    "${c.id}": { "met": true_or_false }`).join(",\n");
+  return rubric.criteria
+    .map(
+      (c) =>
+        `    "${c.id}": { "met": true_or_false, "reason": "If not met, one to two concise sentences: what is missing and a concrete suggestion for how to improve it. If met, empty string." }`,
+    )
+    .join(",\n");
 }
 
 function toFallbackScore(rubric: Rubric): FeedbackScore {
@@ -144,7 +149,8 @@ ${formatCriteriaList(body.rubric)}
 INSTRUCTIONS:
 1. Compare the learner's prompt against the reference prompt
 2. For each criterion, determine if the learner's prompt meets it (true/false)
-3. Write encouraging, constructive feedback in 2-3 sentences.
+3. For each criterion NOT met, write a concise one-sentence "reason" explaining what is missing or could be improved.
+4. Write encouraging, constructive overall feedback in 2-3 sentences.
 
 Respond with ONLY valid JSON in this exact format:
 {

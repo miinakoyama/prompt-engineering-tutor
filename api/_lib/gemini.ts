@@ -32,30 +32,60 @@ if (!geminiKey) {
 }
 
 const ai = new GoogleGenAI({ apiKey: geminiKey });
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite-preview";
+
+const GEMINI_PRIMARY_MODEL =
+  process.env.GEMINI_MODEL || "gemini-3.1-flash-lite-preview";
+const GEMINI_FALLBACK_MODELS = [
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+] as const;
+
+function buildGeminiModelChain(): string[] {
+  const chain = [GEMINI_PRIMARY_MODEL, ...GEMINI_FALLBACK_MODELS];
+  const seen = new Set<string>();
+  return chain.filter((model) => {
+    if (seen.has(model)) return false;
+    seen.add(model);
+    return true;
+  });
+}
+
+function isCapacityOrRateLimitError(error: unknown): boolean {
+  const msg = String(error);
+  const lower = msg.toLowerCase();
+  return (
+    msg.includes("429") ||
+    msg.includes("RESOURCE_EXHAUSTED") ||
+    lower.includes("high demand") ||
+    lower.includes("rate limit") ||
+    msg.includes("503") ||
+    lower.includes("too many requests")
+  );
+}
 
 export async function callGeminiWithRetry(prompt: string, maxRetries = 3) {
+  const models = buildGeminiModelChain();
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
-    try {
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt,
-      });
-      return response.text || "No response received.";
-    } catch (error) {
-      lastError = error as Error;
-      const errorMessage = String(error);
-      if (
-        errorMessage.includes("429") ||
-        errorMessage.includes("RESOURCE_EXHAUSTED")
-      ) {
-        const waitTime = Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000;
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-        continue;
+  for (const model of models) {
+    for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+        });
+        return response.text || "No response received.";
+      } catch (error) {
+        lastError = error as Error;
+        if (isCapacityOrRateLimitError(error)) {
+          const waitTime =
+            Math.pow(2, attempt + 1) * 1000 + Math.random() * 1000;
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
   }
 

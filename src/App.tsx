@@ -891,6 +891,9 @@ export default function App() {
     setPendingAction(null);
     setIsWaitingForResult(true);
     setPromptDrafts((prev) => {
+      if (isTsL3) {
+        return prev;
+      }
       const next = { ...prev };
       delete next[logId];
       return next;
